@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Paint
+GenericName=Image Editor
+GenericName[ru]=Графический редактор
+Comment=Create and edit raster images
+Comment[ru]=Создание и редактирование растровых изображений
+Exec=linux-paint %f
+Icon=linux-paint
+Terminal=false
+Categories=Graphics;RasterGraphics;2DGraphics;
+MimeType=image/png;image/jpeg;image/bmp;image/gif;image/tiff;image/webp;
+Keywords=paint;draw;image;editor;bitmap;
+Keywords[ru]=рисование;краски;изображение;редактор;
+StartupNotify=true
+StartupWMClass=linux-paint

@@ -1,0 +1,33 @@
+# Каталоги сборки
+build/
+build-*/
+cmake-build-*/
+*-build/
+
+# Продукты сборки и пакеты
+*.o
+*.so
+*.a
+linux-paint
+*.deb
+*.AppImage
+AppDir/
+appimage-tools/
+
+# Файлы, которые CMake создаёт сам
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+compile_commands.json
+install_manifest.txt
+*_autogen/
+
+# Среды разработки
+.vscode/
+.idea/
+*.user
+
+# Мусор операционных систем
+.DS_Store
+Thumbs.db
+desktop.ini

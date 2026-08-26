@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect x="4" y="4" width="56" height="56" rx="8" fill="#ffffff" stroke="#78788a" stroke-width="2"/>
+
+  <!-- палитра цветов -->
+  <g>
+    <rect x="10" y="34" width="13" height="11" fill="#dc3c3c"/>
+    <rect x="25" y="34" width="13" height="11" fill="#f5aa32"/>
+    <rect x="40" y="34" width="13" height="11" fill="#fadc46"/>
+    <rect x="10" y="47" width="13" height="11" fill="#5ab45a"/>
+    <rect x="25" y="47" width="13" height="11" fill="#468cdc"/>
+    <rect x="40" y="47" width="13" height="11" fill="#8c5abe"/>
+  </g>
+
+  <!-- кисть -->
+  <g transform="translate(40 20) rotate(35)">
+    <rect x="-3" y="-16" width="6" height="20" fill="#966946"/>
+    <rect x="-3.5" y="3" width="7" height="3" fill="#b4b4be"/>
+    <path d="M -3 6 L 3 6 L 1 16 L -1 16 Z" fill="#3c82c8"/>
+  </g>
+</svg>
