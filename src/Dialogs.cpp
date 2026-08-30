@@ -319,9 +319,7 @@ AppSettings SettingsDialog::result() const
 
 namespace {
 
-// Адрес репозитория. Подставить, когда проект будет опубликован, —
-// больше эту ссылку нигде менять не нужно.
-const char *kGithubUrl = "https://github.com/";
+const char *kGithubUrl = "https://github.com/aselens/LinuxPaint";
 const char *kSiteUrl = "https://inomotion.pages.dev";
 
 } // namespace

@@ -1,66 +1,93 @@
 #include "Backdrop.h"
+#include "WallpaperData.h"
 
+#include <QGuiApplication>
 #include <QPainter>
-#include <QRadialGradient>
+#include <QScreen>
 
 Backdrop::Backdrop(QWidget *parent)
     : QWidget(parent)
-    , m_base(0x1B, 0x1D, 0x23)
-    , m_glow(0x46, 0x6E, 0xBE, 62)
 {
 }
 
-void Backdrop::setColours(const QColor &base, const QColor &glow)
+void Backdrop::setTint(const QColor &tint)
 {
-    if (m_base == base && m_glow == glow)
+    if (m_tint == tint)
         return;
-    m_base = base;
-    m_glow = glow;
+    m_tint = tint;
+    m_backdrop = QImage();      // пересоберётся при следующей отрисовке
     update();
+}
+
+void Backdrop::rebuild()
+{
+    const QScreen *screen = QGuiApplication::primaryScreen();
+    if (!screen)
+        return;
+
+    const QSize target = screen->geometry().size();
+    if (target.isEmpty())
+        return;
+
+    // Разворачиваем сетку цветов в изображение.
+    QImage image(WallpaperData::kWidth, WallpaperData::kHeight, QImage::Format_RGB32);
+    for (int y = 0; y < WallpaperData::kHeight; ++y) {
+        QRgb *line = reinterpret_cast<QRgb *>(image.scanLine(y));
+        for (int x = 0; x < WallpaperData::kWidth; ++x)
+            line[x] = 0xFF000000u | WallpaperData::kPixels[y * WallpaperData::kWidth + x];
+    }
+
+    // Растягиваем в несколько приёмов, а не одним прыжком: при увеличении
+    // сразу во много раз линейная интерполяция даёт видимые грани между
+    // пикселями, а несколько умеренных шагов сглаживают их до неразличимости.
+    while (image.width() * 4 < target.width())
+        image = image.scaled(image.size() * 4, Qt::IgnoreAspectRatio,
+                             Qt::SmoothTransformation);
+    image = image.scaled(target, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+
+    // Подкрашиваем, только если тема просит. Картинка приходит уже готовой,
+    // и в тёмной теме её ничем портить не нужно — там альфа нулевая.
+    if (m_tint.alpha() > 0) {
+        QPainter painter(&image);
+        painter.fillRect(image.rect(), m_tint);
+        painter.end();
+    }
+
+    m_backdrop = image;
 }
 
 void Backdrop::paintEvent(QPaintEvent *event)
 {
     Q_UNUSED(event)
+
+    const QScreen *screen = QGuiApplication::primaryScreen();
+    if (m_backdrop.isNull() || (screen && m_backdrop.size() != screen->geometry().size()))
+        rebuild();
+
     QPainter painter(this);
-    painter.fillRect(rect(), m_base);
 
-    if (m_glow.alpha() == 0)
+    if (m_backdrop.isNull()) {
+        painter.fillRect(rect(), QColor(0x1B, 0x1D, 0x23));
         return;
+    }
 
-    painter.setRenderHint(QPainter::Antialiasing, true);
+    // Берём тот участок картинки, который сейчас под нами. Отсюда и эффект
+    // неподвижного фона: при движении окна меняется вырезаемый участок,
+    // а сама картинка стоит на месте относительно рабочего стола.
+    const QPoint origin = mapToGlobal(QPoint(0, 0)) - screen->geometry().topLeft();
+    QRect source(origin, size());
 
-    // Одно пятно свечения. Центры вынесены за край окна: внутрь попадает
-    // только край пятна, поэтому оно читается как отсвет, а не как круг.
-    auto paintGlow = [&](const QPointF &centre, double radius, int alpha) {
-        if (alpha <= 0 || radius <= 0.0)
-            return;
+    // Окно может уехать за пределы экрана — там картинки нет, поэтому
+    // прижимаем вырезаемый участок к её границам.
+    source.moveLeft(qBound(0, source.left(), qMax(0, m_backdrop.width() - source.width())));
+    source.moveTop(qBound(0, source.top(), qMax(0, m_backdrop.height() - source.height())));
 
-        QColor core = m_glow;
-        core.setAlpha(alpha);
-        // Промежуточная точка гасит свечение вчетверо уже на середине
-        // радиуса. Без неё слабый ореол расползается до самых краёв, и
-        // вместо отсвета снова получается градиент во весь фон.
-        QColor middle = m_glow;
-        middle.setAlpha(alpha / 4);
-        QColor edge = m_glow;
-        edge.setAlpha(0);
+    painter.drawImage(rect(), m_backdrop, source);
+}
 
-        QRadialGradient gradient(centre, radius);
-        gradient.setColorAt(0.0, core);
-        gradient.setColorAt(0.45, middle);
-        gradient.setColorAt(1.0, edge);
-
-        painter.fillRect(rect(), gradient);
-    };
-
-    const double longSide = qMax(width(), height());
-
-    // Основное — из левого нижнего угла.
-    paintGlow(QPointF(width() * 0.02, height() * 1.06), longSide * 0.82,
-              m_glow.alpha());
-
-    // Второе, послабее — от правого края на середине высоты.
-    paintGlow(QPointF(width() * 1.06, height() * 0.5), longSide * 0.55,
-              m_glow.alpha() * 3 / 5);
+void Backdrop::moveEvent(QMoveEvent *event)
+{
+    QWidget::moveEvent(event);
+    // Окно поехало — под ним другой участок картинки.
+    update();
 }

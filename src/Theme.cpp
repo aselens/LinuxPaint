@@ -11,11 +11,9 @@ Mode g_mode = Mode::System;
 bool g_dark = false;
 
 struct Colours {
-    // Фон окна: ровная заливка плюс мягкое свечение из левого верхнего угла.
-    // Сила свечения задана альфой в backdropGlow — оно должно лишь
-    // угадываться, а не разливаться по всему окну.
-    QColor backdropBase;
-    QColor backdropGlow;
+    // Тон, которым приглушены обои на подложке окна. Альфа задаёт силу:
+    // чем она выше, тем меньше обоев проступает наружу.
+    QColor backdropTint;
     QColor window;          // усреднённый цвет: его берёт палитра
     QColor ribbon;          // полоса инструментов, чуть темнее подложки
     QColor ribbonHover;
@@ -45,8 +43,9 @@ Colours lightColours()
     // Светлая тема Paint почти белая, с едва заметным холодным оттенком.
     // Подложка вокруг холста чуть плотнее ленты — так белый лист читается
     // на ней сам по себе, без тяжёлого серого фона.
-    c.backdropBase   = QColor(0xF4, 0xF7, 0xFB);
-    c.backdropGlow   = QColor(0x5A, 0x93, 0xE0, 40);
+    // Обои тёмные, а тема светлая, поэтому приглушать их приходится сильно:
+    // иначе светлая тема потемнеет и перестанет быть светлой.
+    c.backdropTint   = QColor(0xF4, 0xF7, 0xFB, 226);
     c.window         = QColor(0xF5, 0xF8, 0xFC);
     c.ribbon         = QColor(0xEF, 0xF3, 0xF9);      // лента чуть темнее фона
     c.ribbonHover    = QColor(0xE1, 0xE7, 0xF0);
@@ -76,8 +75,9 @@ Colours darkColours()
     // Синева заметна только вверху и постепенно сходит на нет к низу.
     // Остальные оттенки держим почти нейтральными: если подсинить всё
     // подряд, получится не «холодный тёмный», а «синий» — совсем другое.
-    c.backdropBase   = QColor(0x1B, 0x1D, 0x23);
-    c.backdropGlow   = QColor(0x46, 0x6E, 0xBE, 62);
+    // Картинка приходит уже подготовленной и по тону тёмной теме родная —
+    // подкрашивать нечего, показываем как есть.
+    c.backdropTint   = QColor(0, 0, 0, 0);
     c.window         = QColor(0x1F, 0x21, 0x28);
     c.canvasBackdrop = QColor(0x1C, 0x1E, 0x25);
     c.ribbon         = QColor(0x17, 0x19, 0x1E);      // лента чуть темнее подложки
@@ -457,7 +457,7 @@ QTabWidget::pane { border: none; }
         .replace(QStringLiteral("%RIBBONTITLE%"), css(c.ribbonTitle))
         // Лента — полупрозрачный слой: сквозь неё виден градиент подложки,
         // но сама она остаётся темнее фона.
-        .replace(QStringLiteral("%RIBBONLAYER%"), cssa(c.ribbon, 0.72))
+        .replace(QStringLiteral("%RIBBONLAYER%"), cssa(c.ribbon, 0.80))
         .replace(QStringLiteral("%RIBBON%"), css(c.ribbon))
         .replace(QStringLiteral("%SURFACE%"), css(c.surface))
         .replace(QStringLiteral("%BORDER%"), css(c.surfaceBorder))
@@ -467,7 +467,9 @@ QTabWidget::pane { border: none; }
         .replace(QStringLiteral("%PRESSED%"), css(c.pressed))
         .replace(QStringLiteral("%CHECKEDBORDER%"), css(c.checkedBorder))
         .replace(QStringLiteral("%CHECKED%"), css(c.checked))
-        .replace(QStringLiteral("%BACKDROPLAYER%"), cssa(c.canvasBackdrop, 0.55))
+        // Область вокруг холста почти прозрачна: главное, что тут видно, —
+        // фоновая картинка, а этот слой лишь слегка её приглушает.
+        .replace(QStringLiteral("%BACKDROPLAYER%"), cssa(c.canvasBackdrop, 0.25))
         .replace(QStringLiteral("%BACKDROP%"), css(c.canvasBackdrop))
         .replace(QStringLiteral("%ACCENT%"), css(c.accent))
         .replace(QStringLiteral("%SEPARATOR%"), css(c.separator))
@@ -516,14 +518,9 @@ QColor iconForeground()
     return g_dark ? QColor(0xE0, 0xE0, 0xE0) : QColor(0x3C, 0x3C, 0x3C);
 }
 
-QColor backdropBase()
+QColor backdropTint()
 {
-    return g_dark ? darkColours().backdropBase : lightColours().backdropBase;
-}
-
-QColor backdropGlow()
-{
-    return g_dark ? darkColours().backdropGlow : lightColours().backdropGlow;
+    return g_dark ? darkColours().backdropTint : lightColours().backdropTint;
 }
 
 QString modeName(Mode mode)

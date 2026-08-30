@@ -19,8 +19,7 @@ QColor accent();
 QColor iconForeground();
 QString modeName(Mode mode);
 
-// Подложка окна: ровный фон и цвет свечения в углу (сила — в его альфе).
-QColor backdropBase();
-QColor backdropGlow();
+// Тон, которым приглушены обои на подложке окна (сила — в его альфе).
+QColor backdropTint();
 
 } // namespace Theme

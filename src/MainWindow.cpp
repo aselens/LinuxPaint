@@ -1138,7 +1138,7 @@ void MainWindow::refreshBackdrop()
     if (!m_backdrop)
         return;
 
-    m_backdrop->setColours(Theme::backdropBase(), Theme::backdropGlow());
+    m_backdrop->setTint(Theme::backdropTint());
 }
 
 void MainWindow::applyIcons()
