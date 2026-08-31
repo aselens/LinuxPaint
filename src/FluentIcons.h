@@ -186,6 +186,9 @@ inline constexpr Entry kEntries[] = {
 // Возвращает текст значка по имени или nullptr, если такого нет.
 inline const char *svg(const char *name)
 {
+    if (!name)
+        return nullptr;
+
     for (const Entry &entry : kEntries) {
         if (std::strcmp(entry.name, name) == 0)
             return entry.svg;

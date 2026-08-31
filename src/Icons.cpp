@@ -105,6 +105,12 @@ void drawMagnifier(QPainter &p, int sign)
 // запасной вариант своими руками.
 QIcon fluent(const char *name, int size)
 {
+    // Имени может не быть вовсе: так помечены значки, для которых мы
+    // намеренно оставили свой рисунок. Проверка обязательна — дальше имя
+    // уходит в strcmp, а тот пустого указателя не переживает.
+    if (!name)
+        return QIcon();
+
     const char *source = FluentIcons::svg(name);
     if (!source)
         return QIcon();
