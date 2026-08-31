@@ -112,7 +112,7 @@ QIcon fluent(const char *name, int size)
     QByteArray data(source);
     // Все значки набора одноцветные. Подменяем их цвет на цвет темы —
     // так они одинаково читаются и на светлом, и на тёмном фоне.
-    data.replace(FluentIcons::kSourceColour, g_foreground.name().toUtf8());
+    data.replace(QByteArray(FluentIcons::kSourceColour), g_foreground.name().toUtf8());
 
     QBuffer buffer(&data);
     buffer.open(QIODevice::ReadOnly);

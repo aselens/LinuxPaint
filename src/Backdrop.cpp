@@ -60,11 +60,19 @@ void Backdrop::paintEvent(QPaintEvent *event)
 {
     Q_UNUSED(event)
 
-    const QScreen *screen = QGuiApplication::primaryScreen();
-    if (m_backdrop.isNull() || (screen && m_backdrop.size() != screen->geometry().size()))
-        rebuild();
-
     QPainter painter(this);
+
+    // Экран проверяем до всего остального. Раньше проверка стояла так, что
+    // при уже построенной картинке и недоступном экране до обращения к нему
+    // дело всё-таки доходило — по пустому указателю, с падением программы.
+    const QScreen *screen = QGuiApplication::primaryScreen();
+    if (!screen) {
+        painter.fillRect(rect(), QColor(0x1B, 0x1D, 0x23));
+        return;
+    }
+
+    if (m_backdrop.isNull() || m_backdrop.size() != screen->geometry().size())
+        rebuild();
 
     if (m_backdrop.isNull()) {
         painter.fillRect(rect(), QColor(0x1B, 0x1D, 0x23));
