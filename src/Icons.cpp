@@ -1,4 +1,5 @@
 #include "Icons.h"
+#include "FluentIcons.h"
 #include "LogoData.h"
 #include "tools/ShapeTool.h"
 
@@ -99,6 +100,33 @@ void drawMagnifier(QPainter &p, int sign)
     }
 }
 
+// Готовит значок из набора Fluent. Пустой QIcon означает, что значка с таким
+// именем нет либо система не умеет рисовать SVG — тогда вызывающий рисует
+// запасной вариант своими руками.
+QIcon fluent(const char *name, int size)
+{
+    const char *source = FluentIcons::svg(name);
+    if (!source)
+        return QIcon();
+
+    QByteArray data(source);
+    // Все значки набора одноцветные. Подменяем их цвет на цвет темы —
+    // так они одинаково читаются и на светлом, и на тёмном фоне.
+    data.replace(FluentIcons::kSourceColour, g_foreground.name().toUtf8());
+
+    QBuffer buffer(&data);
+    buffer.open(QIODevice::ReadOnly);
+
+    QImageReader reader(&buffer, QByteArrayLiteral("svg"));
+    reader.setScaledSize(QSize(size, size));
+
+    const QImage rendered = reader.read();
+    if (rendered.isNull())
+        return QIcon();
+
+    return QIcon(QPixmap::fromImage(rendered));
+}
+
 void drawDashedBox(QPainter &p)
 {
     QPen pen = line(3.5, Qt::DashLine);
@@ -145,6 +173,27 @@ QColor foreground()
 
 QIcon tool(ToolId id, int size)
 {
+    // Сначала пробуем настоящий значок Windows 11, и только если его нет —
+    // рисуем свой. Так интерфейс совпадает с оригиналом, но программа не
+    // остаётся без значков там, где Qt не умеет рисовать SVG.
+    const char *fluentName = nullptr;
+    switch (id) {
+    case ToolId::Pencil:      fluentName = "tool_pencil";    break;
+    case ToolId::Brush:       fluentName = "tool_brush";     break;
+    case ToolId::Eraser:      fluentName = "tool_eraser";    break;
+    case ToolId::Fill:        fluentName = "tool_fill";      break;
+    case ToolId::Text:        fluentName = "tool_text";      break;
+    case ToolId::ColorPicker: fluentName = "tool_picker";    break;
+    case ToolId::Magnifier:   fluentName = "tool_magnifier"; break;
+    case ToolId::Select:      fluentName = "tool_select";    break;
+    case ToolId::FreeSelect:  fluentName = "tool_lasso";     break;
+    case ToolId::Shape:       fluentName = "tool_shapes";    break;
+    }
+
+    const QIcon ready = fluent(fluentName, size);
+    if (!ready.isNull())
+        return ready;
+
     QPixmap pm = makePixmap(size);
     QPainter p(&pm);
     prepare(p, size);
@@ -338,6 +387,61 @@ QIcon lineWidth(int width, int size)
 
 QIcon action(Action id, int size)
 {
+    const char *fluentName = nullptr;
+    switch (id) {
+    case Action::New:             fluentName = "act_new";          break;
+    case Action::Open:            fluentName = "act_open";         break;
+    case Action::Save:            fluentName = "act_save";         break;
+    case Action::SaveAs:          fluentName = "act_saveas";       break;
+    case Action::Print:           fluentName = "act_print";        break;
+    case Action::Properties:      fluentName = "act_properties";   break;
+    case Action::Exit:            fluentName = "act_exit";         break;
+    case Action::Undo:            fluentName = "act_undo";         break;
+    case Action::Redo:            fluentName = "act_redo";         break;
+    case Action::Cut:             fluentName = "act_cut";          break;
+    case Action::Copy:            fluentName = "act_copy";         break;
+    case Action::Paste:           fluentName = "act_paste";        break;
+    case Action::Crop:            fluentName = "act_crop";         break;
+    case Action::ResizeImage:     fluentName = "act_resize";       break;
+    case Action::RotateRight:     fluentName = "act_rotate_cw";    break;
+    case Action::RotateLeft:      fluentName = "act_rotate_ccw";   break;
+    case Action::FlipHorizontal:  fluentName = "act_flip_h";       break;
+    case Action::FlipVertical:    fluentName = "act_flip_v";       break;
+    case Action::SelectAll:       fluentName = "act_select_all";   break;
+    case Action::InvertSelection: fluentName = "act_select_off";   break;
+    case Action::DeleteSelection: fluentName = "act_delete";       break;
+    case Action::InvertColours:   fluentName = "act_invert";       break;
+    case Action::ClearImage:      fluentName = "act_new";          break;
+    case Action::ZoomIn:          fluentName = "act_zoom_in";      break;
+    case Action::ZoomOut:         fluentName = "act_zoom_out";     break;
+    case Action::ZoomReset:       fluentName = "act_zoom_fit";     break;
+    case Action::Grid:            fluentName = "act_grid";         break;
+    case Action::Rulers:          fluentName = "act_ruler";        break;
+    case Action::Fullscreen:      fluentName = "act_fullscreen";   break;
+    case Action::SwapColours:     fluentName = "act_swap";         break;
+    case Action::Size:            fluentName = "act_size";         break;
+    case Action::About:           fluentName = "act_about";        break;
+    case Action::Share:           fluentName = "act_share";        break;
+    case Action::Settings:        fluentName = "act_settings";     break;
+    case Action::Chevron:         fluentName = "act_chevron_down"; break;
+    case Action::ChevronUp:       fluentName = "act_chevron_up";   break;
+    case Action::CursorPosition:  fluentName = "act_cursor";       break;
+    case Action::CanvasSize:      fluentName = "act_image";        break;
+    case Action::FitToWindow:     fluentName = "act_zoom_fit";     break;
+    case Action::Opacity:         fluentName = "act_opacity";      break;
+    case Action::Layers:          fluentName = "act_layers";       break;
+    case Action::AddLayer:        fluentName = "act_layer_add";    break;
+    case Action::LayerVisible:    fluentName = "act_eye";          break;
+    case Action::LayerHidden:     fluentName = "act_eye_off";      break;
+    // Палитру оставляем своей: у Fluent на её месте одноцветный значок,
+    // а нам нужен именно радужный круг, как в Paint.
+    case Action::EditColours:     fluentName = nullptr;            break;
+    }
+
+    const QIcon ready = fluent(fluentName, size);
+    if (!ready.isNull())
+        return ready;
+
     QPixmap pm = makePixmap(size);
     QPainter p(&pm);
     prepare(p, size);

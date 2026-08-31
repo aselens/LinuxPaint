@@ -44,6 +44,7 @@ set(PAINT_HEADERS
     src/LayersPanel.h
     src/Backdrop.h
     src/WallpaperData.h
+    src/FluentIcons.h
     src/Icons.h
     src/LogoData.h
     src/Theme.h
