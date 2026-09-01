@@ -100,6 +100,36 @@ void drawMagnifier(QPainter &p, int sign)
     }
 }
 
+// Часть инструментов в Paint нарисована в цвете, а не в тон интерфейсу:
+// так они быстрее различаются взглядом среди прочих. Здесь перечислены те,
+// которым положен свой цвет; остальные красятся цветом темы.
+//
+// Оттенки выбраны так, чтобы одинаково читаться и на светлом, и на тёмном
+// фоне: слишком тёмные пропадали бы в тёмной теме, слишком бледные — в
+// светлой.
+QColor fluentColour(const char *name)
+{
+    if (!name)
+        return QColor();
+
+    struct Tinted {
+        const char *name;
+        QRgb colour;
+    };
+
+    static const Tinted kTinted[] = {
+        { "tool_eraser", 0xFFE0819F },   // розовый, как ластик в Paint
+        { "tool_fill",   0xFF3C9AE8 },   // синий, цвет краски из ведра
+        { "tool_picker", 0xFF4FAF62 }    // зелёный кончик пипетки
+    };
+
+    for (const Tinted &entry : kTinted) {
+        if (std::strcmp(entry.name, name) == 0)
+            return QColor::fromRgba(entry.colour);
+    }
+    return QColor();
+}
+
 // Готовит значок из набора Fluent. Пустой QIcon означает, что значка с таким
 // именем нет либо система не умеет рисовать SVG — тогда вызывающий рисует
 // запасной вариант своими руками.
@@ -116,9 +146,12 @@ QIcon fluent(const char *name, int size)
         return QIcon();
 
     QByteArray data(source);
-    // Все значки набора одноцветные. Подменяем их цвет на цвет темы —
-    // так они одинаково читаются и на светлом, и на тёмном фоне.
-    data.replace(QByteArray(FluentIcons::kSourceColour), g_foreground.name().toUtf8());
+
+    // Все значки набора одноцветные, поэтому перекрасить их — это подменить
+    // один цвет. Обычно берём цвет темы, но у некоторых инструментов свой.
+    const QColor tinted = fluentColour(name);
+    const QColor colour = tinted.isValid() ? tinted : g_foreground;
+    data.replace(QByteArray(FluentIcons::kSourceColour), colour.name().toUtf8());
 
     QBuffer buffer(&data);
     buffer.open(QIODevice::ReadOnly);
