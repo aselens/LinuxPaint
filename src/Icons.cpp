@@ -100,34 +100,102 @@ void drawMagnifier(QPainter &p, int sign)
     }
 }
 
-// Часть инструментов в Paint нарисована в цвете, а не в тон интерфейсу:
-// так они быстрее различаются взглядом среди прочих. Здесь перечислены те,
-// которым положен свой цвет; остальные красятся цветом темы.
+// Цветные значки для инструментов, которых нет в цветном наборе Fluent.
+// Там их всего несколько штук — карандаш, кисть и шестерёнка, — а в Paint
+// в цвете нарисовано больше. Недостающие рисуем сами, из нескольких частей
+// разного цвета, а не одной заливкой: именно это отличает настоящий цветной
+// значок от подкрашенного контура.
 //
-// Оттенки выбраны так, чтобы одинаково читаться и на светлом, и на тёмном
-// фоне: слишком тёмные пропадали бы в тёмной теме, слишком бледные — в
-// светлой.
-QColor fluentColour(const char *name)
+// Возвращает пустой QIcon, если для инструмента своего рисунка нет.
+QIcon colouredTool(ToolId id, int size)
 {
-    if (!name)
-        return QColor();
+    if (id != ToolId::Eraser && id != ToolId::Fill && id != ToolId::ColorPicker)
+        return QIcon();
 
-    struct Tinted {
-        const char *name;
-        QRgb colour;
-    };
+    QPixmap pm = makePixmap(size);
+    QPainter p(&pm);
+    prepare(p, size);
+    p.setPen(Qt::NoPen);
 
-    static const Tinted kTinted[] = {
-        { "tool_eraser", 0xFFE0819F },   // розовый, как ластик в Paint
-        { "tool_fill",   0xFF3C9AE8 },   // синий, цвет краски из ведра
-        { "tool_picker", 0xFF4FAF62 }    // зелёный кончик пипетки
-    };
-
-    for (const Tinted &entry : kTinted) {
-        if (std::strcmp(entry.name, name) == 0)
-            return QColor::fromRgba(entry.colour);
+    switch (id) {
+    case ToolId::Eraser: {
+        // Розовая резинка со светлой манжетой, поставленная под углом.
+        p.save();
+        p.translate(32, 34);
+        p.rotate(-38);
+        p.setBrush(QColor(0xE0, 0x76, 0x99));
+        p.drawRoundedRect(QRectF(-21, -13, 42, 26), 4, 4);
+        p.setBrush(QColor(0xF4, 0xF6, 0xF9));
+        p.drawRoundedRect(QRectF(-21, -13, 15, 26), 4, 4);
+        p.setBrush(QColor(0xC2, 0x5B, 0x7D));
+        p.drawRect(QRectF(-7, -13, 2, 26));
+        p.restore();
+        break;
     }
-    return QColor();
+
+    case ToolId::Fill: {
+        // Синее ведро с наклоном и капля краски рядом.
+        p.save();
+        p.translate(29, 31);
+        p.rotate(-30);
+        QPainterPath bucket;
+        bucket.moveTo(-16, -12);
+        bucket.lineTo(16, -12);
+        bucket.lineTo(11, 17);
+        bucket.lineTo(-11, 17);
+        bucket.closeSubpath();
+        p.setBrush(QColor(0x3C, 0x9A, 0xE8));
+        p.drawPath(bucket);
+        p.setBrush(QColor(0x8F, 0xC8, 0xF4));
+        p.drawRect(QRectF(-16, -12, 32, 6));
+        p.setPen(QPen(QColor(0x24, 0x6E, 0xAB), 3));
+        p.setBrush(Qt::NoBrush);
+        p.drawArc(QRectF(-16, -24, 32, 24), 0, 180 * 16);
+        p.restore();
+
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(0x3C, 0x9A, 0xE8));
+        QPainterPath drop;
+        drop.moveTo(51, 32);
+        drop.cubicTo(58, 43, 58, 52, 51, 54);
+        drop.cubicTo(44, 52, 44, 43, 51, 32);
+        drop.closeSubpath();
+        p.drawPath(drop);
+        break;
+    }
+
+    case ToolId::ColorPicker: {
+        // Серая пипетка с цветной каплей на кончике.
+        p.setBrush(QColor(0x9A, 0xA3, 0xAE));
+        p.save();
+        p.translate(44, 20);
+        p.rotate(45);
+        p.drawRoundedRect(QRectF(-7, -13, 14, 26), 5, 5);
+        p.restore();
+
+        p.setBrush(QColor(0xC4, 0xCB, 0xD4));
+        p.save();
+        p.translate(30, 34);
+        p.rotate(45);
+        p.drawRect(QRectF(-5, -14, 10, 28));
+        p.restore();
+
+        p.setBrush(QColor(0x4F, 0xAF, 0x62));
+        QPainterPath tip;
+        tip.moveTo(10, 54);
+        tip.lineTo(16, 36);
+        tip.lineTo(30, 50);
+        tip.closeSubpath();
+        p.drawPath(tip);
+        break;
+    }
+
+    default:
+        break;
+    }
+
+    p.end();
+    return QIcon(pm);
 }
 
 // Готовит значок из набора Fluent. Пустой QIcon означает, что значка с таким
@@ -147,11 +215,10 @@ QIcon fluent(const char *name, int size)
 
     QByteArray data(source);
 
-    // Все значки набора одноцветные, поэтому перекрасить их — это подменить
-    // один цвет. Обычно берём цвет темы, но у некоторых инструментов свой.
-    const QColor tinted = fluentColour(name);
-    const QColor colour = tinted.isValid() ? tinted : g_foreground;
-    data.replace(QByteArray(FluentIcons::kSourceColour), colour.name().toUtf8());
+    // Одноцветные значки перекрашиваем под тему — это подмена одного цвета.
+    // Полноцветные (имена с _color) трогать нельзя: там цветов много, и
+    // подменять в них нечего.
+    data.replace(QByteArray(FluentIcons::kSourceColour), g_foreground.name().toUtf8());
 
     QBuffer buffer(&data);
     buffer.open(QIODevice::ReadOnly);
@@ -212,13 +279,17 @@ QColor foreground()
 
 QIcon tool(ToolId id, int size)
 {
-    // Сначала пробуем настоящий значок Windows 11, и только если его нет —
-    // рисуем свой. Так интерфейс совпадает с оригиналом, но программа не
-    // остаётся без значков там, где Qt не умеет рисовать SVG.
+    // Порядок предпочтений: полноцветный значок Microsoft, затем наш
+    // собственный цветной, затем одноцветный из того же набора, и лишь
+    // в самом конце — рисованный запасной.
+    const QIcon own = colouredTool(id, size);
+    if (!own.isNull())
+        return own;
+
     const char *fluentName = nullptr;
     switch (id) {
-    case ToolId::Pencil:      fluentName = "tool_pencil";    break;
-    case ToolId::Brush:       fluentName = "tool_brush";     break;
+    case ToolId::Pencil:      fluentName = "tool_pencil_color"; break;
+    case ToolId::Brush:       fluentName = "tool_brush_color";  break;
     case ToolId::Eraser:      fluentName = "tool_eraser";    break;
     case ToolId::Fill:        fluentName = "tool_fill";      break;
     case ToolId::Text:        fluentName = "tool_text";      break;
@@ -461,7 +532,7 @@ QIcon action(Action id, int size)
     case Action::Size:            fluentName = "act_size";         break;
     case Action::About:           fluentName = "act_about";        break;
     case Action::Share:           fluentName = "act_share";        break;
-    case Action::Settings:        fluentName = "act_settings";     break;
+    case Action::Settings:        fluentName = "act_settings_color"; break;
     case Action::Chevron:         fluentName = "act_chevron_down"; break;
     case Action::ChevronUp:       fluentName = "act_chevron_up";   break;
     case Action::CursorPosition:  fluentName = "act_cursor";       break;
