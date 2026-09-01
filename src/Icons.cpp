@@ -438,17 +438,19 @@ QIcon shape(ShapeType id, int size)
     // и жирные линии в ней сливаются.
     outline(p, 3.4);
 
-    const QRectF box(11, 13, 42, 38);
+    // Фигура занимает почти всё поле значка: в плашке ленты клетки мелкие,
+    // и запас по краям только съедал бы читаемость.
+    const QRectF box(7, 8, 50, 48);
 
     if (id == ShapeType::Line) {
-        p.drawLine(QPointF(12, 52), QPointF(52, 12));
+        p.drawLine(QPointF(8, 56), QPointF(56, 8));
     } else if (id == ShapeType::Curve) {
         QPainterPath path;
-        path.moveTo(10, 46);
-        path.cubicTo(22, 8, 42, 60, 54, 20);
+        path.moveTo(6, 50);
+        path.cubicTo(20, 4, 44, 60, 58, 16);
         p.drawPath(path);
     } else if (id == ShapeType::Polygon) {
-        p.drawPath(polyline({{12, 46}, {24, 14}, {44, 24}, {52, 50}}, true));
+        p.drawPath(polyline({{8, 50}, {22, 10}, {46, 22}, {56, 54}}, true));
     } else {
         p.drawPath(ShapeTool::pathForShape(id, box));
     }

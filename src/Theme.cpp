@@ -426,6 +426,15 @@ QScrollArea#ShapesBox {
     border: 1px solid %SEPARATOR%;
     border-radius: 6px;
 }
+/* Полоса прокрутки в плашке с фигурами — узкая: места там мало. */
+QScrollArea#ShapesBox QScrollBar:vertical {
+    width: 6px;
+    margin: 2px 1px;
+}
+QScrollArea#ShapesBox QScrollBar::handle:vertical {
+    border-radius: 3px;
+    margin: 0;
+}
 
 QScrollBar:vertical {
     background: transparent;
@@ -526,7 +535,9 @@ QColor accent()
 
 QColor iconForeground()
 {
-    return g_dark ? QColor(0xE0, 0xE0, 0xE0) : QColor(0x3C, 0x3C, 0x3C);
+    // В тёмной теме значки именно белые, а не светло-серые: серые выглядят
+    // приглушёнными, будто недоступны для нажатия.
+    return g_dark ? QColor(0xFF, 0xFF, 0xFF) : QColor(0x26, 0x26, 0x26);
 }
 
 QColor backdropTint()

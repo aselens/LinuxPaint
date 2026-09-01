@@ -71,6 +71,32 @@ QToolButton *smallActionButton(QAction *action)
     return button;
 }
 
+// Область прокрутки, показывающая полосу только под курсором. Постоянно
+// висящая полоса в маленькой плашке с фигурами занимает заметную часть её
+// ширины и лезет в глаза, а нужна лишь в момент прокрутки.
+class HoverScrollArea : public QScrollArea
+{
+public:
+    explicit HoverScrollArea(QWidget *parent = nullptr)
+        : QScrollArea(parent)
+    {
+        setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    }
+
+protected:
+    void enterEvent(QEnterEvent *event) override
+    {
+        setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        QScrollArea::enterEvent(event);
+    }
+
+    void leaveEvent(QEvent *event) override
+    {
+        setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        QScrollArea::leaveEvent(event);
+    }
+};
+
 // Шаг делений линейки подбирается так, чтобы подписи не слипались.
 int rulerStep(double zoom)
 {
@@ -802,7 +828,9 @@ void MainWindow::createRibbon()
     for (const auto &entry : shapeList) {
         auto *button = new QToolButton;
         button->setIcon(Icons::shape(entry.type));
-        button->setIconSize(QSize(20, 20));
+        // Значок почти во всю кнопку: клетки менять нельзя, а фигуры должны
+        // быть крупнее.
+        button->setIconSize(QSize(24, 24));
         button->setFixedSize(27, 27);
         button->setAutoRaise(true);
         button->setCheckable(true);
@@ -830,15 +858,17 @@ void MainWindow::createRibbon()
     for (int i = 0; i < shapeButtons.size(); ++i)
         shapesGrid->addWidget(shapeButtons[i], i / shapesPerRow, i % shapesPerRow);
 
-    auto *shapesBox = new QScrollArea;
+    auto *shapesBox = new HoverScrollArea;
     shapesBox->setObjectName(QStringLiteral("ShapesBox"));
     shapesBox->setWidget(shapesHost);
     shapesBox->setWidgetResizable(true);
     shapesBox->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    shapesBox->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     shapesBox->setFrameShape(QFrame::NoFrame);
-    // Высота с запасом на треть ряда: именно она и создаёт видимый край.
-    shapesBox->setFixedSize(shapesPerRow * 29 + 18, 3 * 29 + 14);
+    // Ширина с постоянным запасом под полосу прокрутки: полоса появляется
+    // и исчезает вместе с курсором, и без запаса сетка при её появлении
+    // дёргалась бы, теряя последний столбец.
+    // Высота с запасом на треть ряда — она и создаёт видимый край снизу.
+    shapesBox->setFixedSize(shapesPerRow * 29 + 22, 3 * 29 + 14);
 
     shapes->addItem(shapesBox);
     shapes->addItem(styleColumn);
