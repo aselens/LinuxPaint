@@ -288,8 +288,10 @@ QIcon tool(ToolId id, int size)
 
     const char *fluentName = nullptr;
     switch (id) {
-    case ToolId::Pencil:      fluentName = "tool_pencil_color"; break;
-    case ToolId::Brush:       fluentName = "tool_brush_color";  break;
+    // Карандаш и кисть в Paint одноцветные, хотя цветные версии у Microsoft
+    // есть. Берём одноцветные — так же, как в оригинале.
+    case ToolId::Pencil:      fluentName = "tool_pencil";    break;
+    case ToolId::Brush:       fluentName = "tool_brush";     break;
     case ToolId::Eraser:      fluentName = "tool_eraser";    break;
     case ToolId::Fill:        fluentName = "tool_fill";      break;
     case ToolId::Text:        fluentName = "tool_text";      break;
@@ -532,7 +534,7 @@ QIcon action(Action id, int size)
     case Action::Size:            fluentName = "act_size";         break;
     case Action::About:           fluentName = "act_about";        break;
     case Action::Share:           fluentName = "act_share";        break;
-    case Action::Settings:        fluentName = "act_settings_color"; break;
+    case Action::Settings:        fluentName = "act_settings";     break;
     case Action::Chevron:         fluentName = "act_chevron_down"; break;
     case Action::ChevronUp:       fluentName = "act_chevron_up";   break;
     case Action::CursorPosition:  fluentName = "act_cursor";       break;
