@@ -117,74 +117,90 @@ QIcon colouredTool(ToolId id, int size)
     prepare(p, size);
     p.setPen(Qt::NoPen);
 
+    // Цвета сняты пипеткой прямо со скриншота Paint, а не подобраны на глаз.
+    const QColor eraserBody(0xF6, 0xAE, 0xAC);
+    const QColor eraserLight(0xF8, 0xC1, 0xC0);
+    const QColor eraserBand(0xFD, 0xF7, 0xF6);
+    const QColor paintBlue(0x51, 0xA0, 0xC5);
+    const QColor paintShade(0x4A, 0x8D, 0xAD);
+    const QColor paintDark(0x40, 0x71, 0x89);
+    const QColor paintDrop(0xFF, 0x63, 0x27);
+    const QColor pickerBlue(0x54, 0xAC, 0xD4);
+    const QColor pickerBody(0xDD, 0xDE, 0xDE);
+
     switch (id) {
     case ToolId::Eraser: {
-        // Розовая резинка со светлой манжетой, поставленная под углом.
+        // Розовая резинка под наклоном: светлая верхняя грань, белая манжета
+        // с одного конца.
         p.save();
-        p.translate(32, 34);
+        p.translate(31, 34);
         p.rotate(-38);
-        p.setBrush(QColor(0xE0, 0x76, 0x99));
-        p.drawRoundedRect(QRectF(-21, -13, 42, 26), 4, 4);
-        p.setBrush(QColor(0xF4, 0xF6, 0xF9));
-        p.drawRoundedRect(QRectF(-21, -13, 15, 26), 4, 4);
-        p.setBrush(QColor(0xC2, 0x5B, 0x7D));
-        p.drawRect(QRectF(-7, -13, 2, 26));
+        p.setBrush(eraserBody);
+        p.drawRoundedRect(QRectF(-21, -13, 42, 26), 5, 5);
+        p.setBrush(eraserLight);
+        p.drawRoundedRect(QRectF(-21, -13, 42, 11), 5, 5);
+        p.setBrush(eraserBand);
+        p.drawRoundedRect(QRectF(-21, -13, 14, 26), 5, 5);
         p.restore();
         break;
     }
 
     case ToolId::Fill: {
-        // Синее ведро с наклоном и капля краски рядом.
+        // Синее ведро, наклонённое влево, и оранжевая капля краски под ним.
         p.save();
-        p.translate(29, 31);
-        p.rotate(-30);
+        p.translate(28, 27);
+        p.rotate(-35);
+
         QPainterPath bucket;
-        bucket.moveTo(-16, -12);
-        bucket.lineTo(16, -12);
-        bucket.lineTo(11, 17);
-        bucket.lineTo(-11, 17);
+        bucket.moveTo(-15, -10);
+        bucket.lineTo(15, -10);
+        bucket.lineTo(10, 16);
+        bucket.lineTo(-10, 16);
         bucket.closeSubpath();
-        p.setBrush(QColor(0x3C, 0x9A, 0xE8));
+        p.setBrush(paintBlue);
         p.drawPath(bucket);
-        p.setBrush(QColor(0x8F, 0xC8, 0xF4));
-        p.drawRect(QRectF(-16, -12, 32, 6));
-        p.setPen(QPen(QColor(0x24, 0x6E, 0xAB), 3));
+
+        p.setBrush(paintShade);
+        p.drawRect(QRectF(-15, -10, 30, 5));
+
+        p.setPen(QPen(paintDark, 3));
         p.setBrush(Qt::NoBrush);
-        p.drawArc(QRectF(-16, -24, 32, 24), 0, 180 * 16);
+        p.drawArc(QRectF(-15, -23, 30, 24), 0, 180 * 16);
         p.restore();
 
         p.setPen(Qt::NoPen);
-        p.setBrush(QColor(0x3C, 0x9A, 0xE8));
+        p.setBrush(paintDrop);
         QPainterPath drop;
-        drop.moveTo(51, 32);
-        drop.cubicTo(58, 43, 58, 52, 51, 54);
-        drop.cubicTo(44, 52, 44, 43, 51, 32);
+        drop.moveTo(46, 34);
+        drop.cubicTo(53, 44, 53, 52, 46, 54);
+        drop.cubicTo(39, 52, 39, 44, 46, 34);
         drop.closeSubpath();
         p.drawPath(drop);
         break;
     }
 
     case ToolId::ColorPicker: {
-        // Серая пипетка с цветной каплей на кончике.
-        p.setBrush(QColor(0x9A, 0xA3, 0xAE));
+        // Пипетка: синяя колба справа вверху, светлый корпус по диагонали
+        // вниз-влево, кончик внизу.
+        p.setBrush(pickerBody);
         p.save();
-        p.translate(44, 20);
+        p.translate(29, 37);
         p.rotate(45);
-        p.drawRoundedRect(QRectF(-7, -13, 14, 26), 5, 5);
+        p.drawRect(QRectF(-5, -15, 10, 30));
         p.restore();
 
-        p.setBrush(QColor(0xC4, 0xCB, 0xD4));
+        p.setBrush(pickerBlue);
         p.save();
-        p.translate(30, 34);
+        p.translate(44, 21);
         p.rotate(45);
-        p.drawRect(QRectF(-5, -14, 10, 28));
+        p.drawRoundedRect(QRectF(-9, -12, 18, 24), 7, 7);
         p.restore();
 
-        p.setBrush(QColor(0x4F, 0xAF, 0x62));
+        p.setBrush(paintShade);
         QPainterPath tip;
-        tip.moveTo(10, 54);
-        tip.lineTo(16, 36);
-        tip.lineTo(30, 50);
+        tip.moveTo(10, 55);
+        tip.lineTo(15, 40);
+        tip.lineTo(25, 50);
         tip.closeSubpath();
         p.drawPath(tip);
         break;
