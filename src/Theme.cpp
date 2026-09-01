@@ -416,6 +416,17 @@ QScrollArea > QWidget > QWidget {
     background: %BACKDROPLAYER%;
 }
 
+/* Сетка фигур в ленте — тоже область прокрутки, но ей нужна рамка и
+   прозрачный фон. Правило идёт после общего, иначе то бы его перебило. */
+QScrollArea#ShapesBox,
+QScrollArea#ShapesBox > QWidget > QWidget {
+    background: transparent;
+}
+QScrollArea#ShapesBox {
+    border: 1px solid %SEPARATOR%;
+    border-radius: 6px;
+}
+
 QScrollBar:vertical {
     background: transparent;
     width: 12px;

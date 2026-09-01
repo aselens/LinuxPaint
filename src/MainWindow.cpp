@@ -819,7 +819,28 @@ void MainWindow::createRibbon()
         shapeButtons.append(button);
         m_shapeButtons.append(button);
     }
-    shapes->addItem(RibbonUi::buttonGrid(shapeButtons, 3));
+    // Сетка фигур по семь в ряд, обведённая рамкой, — как в Paint. Все они
+    // в три ряда не помещаются, поэтому лишние уходят под прокрутку, и край
+    // четвёртого ряда выглядывает снизу, подсказывая, что там ещё есть.
+    const int shapesPerRow = 7;
+    auto *shapesHost = new QWidget;
+    auto *shapesGrid = new QGridLayout(shapesHost);
+    shapesGrid->setContentsMargins(3, 3, 3, 3);
+    shapesGrid->setSpacing(2);
+    for (int i = 0; i < shapeButtons.size(); ++i)
+        shapesGrid->addWidget(shapeButtons[i], i / shapesPerRow, i % shapesPerRow);
+
+    auto *shapesBox = new QScrollArea;
+    shapesBox->setObjectName(QStringLiteral("ShapesBox"));
+    shapesBox->setWidget(shapesHost);
+    shapesBox->setWidgetResizable(true);
+    shapesBox->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    shapesBox->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    shapesBox->setFrameShape(QFrame::NoFrame);
+    // Высота с запасом на треть ряда: именно она и создаёт видимый край.
+    shapesBox->setFixedSize(shapesPerRow * 29 + 18, 3 * 29 + 14);
+
+    shapes->addItem(shapesBox);
     shapes->addItem(styleColumn);
 
     // --- цвета ---

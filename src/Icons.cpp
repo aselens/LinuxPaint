@@ -434,7 +434,9 @@ QIcon shape(ShapeType id, int size)
     QPixmap pm = makePixmap(size);
     QPainter p(&pm);
     prepare(p, size);
-    outline(p, 4.0);
+    // Контур тоньше, чем у прочих значков: фигуры стоят плотной сеткой,
+    // и жирные линии в ней сливаются.
+    outline(p, 3.4);
 
     const QRectF box(11, 13, 42, 38);
 
