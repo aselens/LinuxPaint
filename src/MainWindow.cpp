@@ -851,24 +851,38 @@ void MainWindow::createRibbon()
     // в три ряда не помещаются, поэтому лишние уходят под прокрутку, и край
     // четвёртого ряда выглядывает снизу, подсказывая, что там ещё есть.
     const int shapesPerRow = 7;
+    const int shapeCell = 27;
+    const int shapeGap = 1;
+    const int shapeMargin = 3;
+    const int shapeRows = (int(shapeButtons.size()) + shapesPerRow - 1) / shapesPerRow;
+
     auto *shapesHost = new QWidget;
     auto *shapesGrid = new QGridLayout(shapesHost);
-    shapesGrid->setContentsMargins(3, 3, 3, 3);
-    shapesGrid->setSpacing(2);
+    shapesGrid->setContentsMargins(shapeMargin, shapeMargin, shapeMargin, shapeMargin);
+    shapesGrid->setSpacing(shapeGap);
     for (int i = 0; i < shapeButtons.size(); ++i)
         shapesGrid->addWidget(shapeButtons[i], i / shapesPerRow, i % shapesPerRow);
+
+    // Размер сетки задан жёстко, и она не растягивается под область
+    // просмотра. Иначе при появлении полосы прокрутки виджет ужимался бы,
+    // и все фигуры прыгали влево, а при уходе курсора — обратно.
+    const int hostWidth = shapesPerRow * shapeCell + (shapesPerRow - 1) * shapeGap
+                          + shapeMargin * 2;
+    const int hostHeight = shapeRows * shapeCell + (shapeRows - 1) * shapeGap
+                           + shapeMargin * 2;
+    shapesHost->setFixedSize(hostWidth, hostHeight);
 
     auto *shapesBox = new HoverScrollArea;
     shapesBox->setObjectName(QStringLiteral("ShapesBox"));
     shapesBox->setWidget(shapesHost);
-    shapesBox->setWidgetResizable(true);
+    shapesBox->setWidgetResizable(false);
     shapesBox->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     shapesBox->setFrameShape(QFrame::NoFrame);
-    // Ширина с постоянным запасом под полосу прокрутки: полоса появляется
-    // и исчезает вместе с курсором, и без запаса сетка при её появлении
-    // дёргалась бы, теряя последний столбец.
-    // Высота с запасом на треть ряда — она и создаёт видимый край снизу.
-    shapesBox->setFixedSize(shapesPerRow * 29 + 22, 3 * 29 + 14);
+    // По ширине — запас под полосу прокрутки, чтобы она никого не двигала.
+    // По высоте — три ряда и полоска четвёртого: она и показывает, что
+    // фигуры на этом не кончаются.
+    shapesBox->setFixedSize(hostWidth + 12,
+                            3 * shapeCell + 2 * shapeGap + shapeMargin * 2 + 9);
 
     shapes->addItem(shapesBox);
     shapes->addItem(styleColumn);
