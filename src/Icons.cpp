@@ -288,10 +288,11 @@ QIcon tool(ToolId id, int size)
 
     const char *fluentName = nullptr;
     switch (id) {
-    // Карандаш и кисть в Paint одноцветные, хотя цветные версии у Microsoft
-    // есть. Берём одноцветные — так же, как в оригинале.
-    case ToolId::Pencil:      fluentName = "tool_pencil";    break;
-    case ToolId::Brush:       fluentName = "tool_brush";     break;
+    // У карандаша берём полноцветную версию Microsoft: в Paint он жёлтый,
+    // и это их же рисунок — значит, цвета совпадут точно. Кисть в Paint
+    // одноцветная, хотя цветная версия у них тоже есть.
+    case ToolId::Pencil:      fluentName = "tool_pencil_color"; break;
+    case ToolId::Brush:       fluentName = "tool_brush";        break;
     case ToolId::Eraser:      fluentName = "tool_eraser";    break;
     case ToolId::Fill:        fluentName = "tool_fill";      break;
     case ToolId::Text:        fluentName = "tool_text";      break;
