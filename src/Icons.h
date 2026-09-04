@@ -36,6 +36,9 @@ QIcon action(Action id, int size = 24);
 QIcon withChevron(const QIcon &base, int size = 24);
 QIcon tool(ToolId id, int size = 24);
 QIcon brush(BrushType id, int size = 24);
+// Широкий образец мазка для галереи кистей: одна плавная волна во всю
+// ширину, нанесённая той самой кистью, — как в Paint.
+QIcon brushSample(BrushType id, const QSize &size);
 QIcon shape(ShapeType id, int size = 24);
 QIcon colourSwatch(const QColor &colour, int size = 24);
 QIcon strokeStyle(StrokeStyle style, int size = 24);

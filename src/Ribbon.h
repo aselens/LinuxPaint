@@ -66,30 +66,61 @@ private:
 };
 
 // Всплывающая галерея (кисти, фигуры, толщина линии) — сетка значков.
+// Строка галереи: слева название, справа образец мазка во всю ширину —
+// как в Paint, где кисть выбирают по виду штриха, а не по мелкому значку.
+class GalleryRow : public QWidget
+{
+    Q_OBJECT
+
+public:
+    GalleryRow(int id, const QString &text, const QIcon &preview,
+               QWidget *parent = nullptr);
+
+    void setPreview(const QIcon &preview);
+    void setChecked(bool on);
+
+signals:
+    void clicked(int id);
+
+protected:
+    void paintEvent(QPaintEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
+    void enterEvent(QEnterEvent *event) override;
+    void leaveEvent(QEvent *event) override;
+
+private:
+    int m_id = -1;
+    QString m_text;
+    QIcon m_preview;
+    bool m_checked = false;
+    bool m_hovered = false;
+};
+
 class GalleryPopup : public QMenu
 {
     Q_OBJECT
 
 public:
-    explicit GalleryPopup(int columns, QWidget *parent = nullptr);
+    explicit GalleryPopup(QWidget *parent = nullptr);
 
-    void addEntry(int id, const QIcon &icon, const QString &tooltip);
+    // Размер образца. Тот, кто их рисует, должен знать его точно: иначе
+    // картинку придётся масштабировать, а текстура кисти этого не терпит.
+    static QSize previewSize();
+
+    void addEntry(int id, const QIcon &preview, const QString &text);
     void setCurrentEntry(int id);
     int currentEntry() const { return m_current; }
-    QIcon entryIcon(int id) const;
-    // Значки в галереях рисуются под цвет темы, поэтому при её смене
-    // их нужно перерисовать так же, как значки действий.
-    void updateEntryIcon(int id, const QIcon &icon);
+    // Образцы рисуются цветом темы, поэтому при её смене их нужно
+    // перерисовать так же, как значки действий.
+    void updateEntryIcon(int id, const QIcon &preview);
 
 signals:
     void entrySelected(int id);
 
 private:
-    QGridLayout *m_grid = nullptr;
-    int m_columns = 4;
-    int m_count = 0;
+    QVBoxLayout *m_rows = nullptr;
     int m_current = -1;
-    QVector<QToolButton *> m_buttons;
+    QVector<GalleryRow *> m_items;
     QVector<int> m_ids;
 };
 

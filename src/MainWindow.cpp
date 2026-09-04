@@ -704,7 +704,7 @@ void MainWindow::createRibbon()
 
     // --- кисти ---
     auto *brushes = m_ribbon->addGroup(tr("Кисти"));
-    m_brushGallery = new GalleryPopup(3, this);
+    m_brushGallery = new GalleryPopup(this);
     const struct { BrushType type; const char *name; } brushList[] = {
         {BrushType::Brush,            QT_TR_NOOP("Кисть")},
         {BrushType::Calligraphy1,     QT_TR_NOOP("Каллиграфическая кисть 1")},
@@ -717,7 +717,9 @@ void MainWindow::createRibbon()
         {BrushType::WatercolourBrush, QT_TR_NOOP("Акварель")}
     };
     for (const auto &entry : brushList)
-        m_brushGallery->addEntry(int(entry.type), Icons::brush(entry.type), tr(entry.name));
+        m_brushGallery->addEntry(int(entry.type),
+                                 Icons::brushSample(entry.type, GalleryPopup::previewSize()),
+                                 tr(entry.name));
     m_brushGallery->setCurrentEntry(int(BrushType::Brush));
 
     m_brushButton = RibbonUi::iconButton(m_toolActions.value(int(ToolId::Brush)), 40, 24);
@@ -1320,7 +1322,8 @@ void MainWindow::applyIcons()
     // Содержимое галерей и сетки фигур тоже нарисовано цветом темы.
     if (m_brushGallery) {
         for (int i = int(BrushType::Brush); i <= int(BrushType::WatercolourBrush); ++i)
-            m_brushGallery->updateEntryIcon(i, Icons::brush(BrushType(i)));
+            m_brushGallery->updateEntryIcon(
+                i, Icons::brushSample(BrushType(i), GalleryPopup::previewSize()));
     }
     // Порядок кнопок совпадает с порядком значений ShapeType.
     for (int i = 0; i < m_shapeButtons.size(); ++i)

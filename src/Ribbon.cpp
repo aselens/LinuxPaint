@@ -4,6 +4,8 @@
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMouseEvent>
+#include <QPainter>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QWidgetAction>
@@ -124,38 +126,119 @@ void Ribbon::setCollapsed(bool collapsed)
 
 // --- GalleryPopup --------------------------------------------------------
 
-GalleryPopup::GalleryPopup(int columns, QWidget *parent)
+namespace {
+
+// Размеры строки галереи. Ширина взята под самое длинное название кисти,
+// высота — чтобы образец мазка дышал, а не жался к краям.
+const int kRowWidth = 252;
+const int kRowHeight = 42;
+const int kRowPadding = 14;
+const QSize kPreviewSize(116, 30);
+
+} // namespace
+
+GalleryRow::GalleryRow(int id, const QString &text, const QIcon &preview, QWidget *parent)
+    : QWidget(parent)
+    , m_id(id)
+    , m_text(text)
+    , m_preview(preview)
+{
+    setFixedSize(kRowWidth, kRowHeight);
+    setCursor(Qt::PointingHandCursor);
+}
+
+void GalleryRow::setPreview(const QIcon &preview)
+{
+    m_preview = preview;
+    update();
+}
+
+void GalleryRow::setChecked(bool on)
+{
+    if (m_checked == on)
+        return;
+    m_checked = on;
+    update();
+}
+
+void GalleryRow::paintEvent(QPaintEvent *event)
+{
+    Q_UNUSED(event)
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, true);
+
+    // Подсветка выбранной строки заметнее, чем подсветка под курсором,
+    // но обе полупрозрачны: строка не должна спорить с образцом мазка.
+    if (m_checked || m_hovered) {
+        QColor fill = palette().color(m_checked ? QPalette::Highlight
+                                                : QPalette::WindowText);
+        fill.setAlpha(m_checked ? 90 : 30);
+        p.setPen(Qt::NoPen);
+        p.setBrush(fill);
+        p.drawRoundedRect(QRectF(rect()).adjusted(2, 1, -2, -1), 6, 6);
+    }
+
+    p.setPen(palette().color(QPalette::WindowText));
+    const int textWidth = width() - kRowPadding * 2 - kPreviewSize.width() - 8;
+    p.drawText(QRect(kRowPadding, 0, textWidth, height()),
+               Qt::AlignLeft | Qt::AlignVCenter, m_text);
+
+    const QRect preview(width() - kRowPadding - kPreviewSize.width(),
+                        (height() - kPreviewSize.height()) / 2,
+                        kPreviewSize.width(), kPreviewSize.height());
+    p.drawPixmap(preview, m_preview.pixmap(kPreviewSize));
+}
+
+void GalleryRow::mouseReleaseEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton && rect().contains(event->pos()))
+        emit clicked(m_id);
+}
+
+void GalleryRow::enterEvent(QEnterEvent *event)
+{
+    QWidget::enterEvent(event);
+    m_hovered = true;
+    update();
+}
+
+void GalleryRow::leaveEvent(QEvent *event)
+{
+    QWidget::leaveEvent(event);
+    m_hovered = false;
+    update();
+}
+
+// --- GalleryPopup --------------------------------------------------------
+
+QSize GalleryPopup::previewSize()
+{
+    return kPreviewSize;
+}
+
+GalleryPopup::GalleryPopup(QWidget *parent)
     : QMenu(parent)
-    , m_columns(qMax(1, columns))
 {
     auto *host = new QWidget(this);
-    m_grid = new QGridLayout(host);
-    m_grid->setContentsMargins(6, 6, 6, 6);
-    m_grid->setSpacing(2);
+    m_rows = new QVBoxLayout(host);
+    m_rows->setContentsMargins(4, 4, 4, 4);
+    m_rows->setSpacing(0);
 
     auto *action = new QWidgetAction(this);
     action->setDefaultWidget(host);
     addAction(action);
 }
 
-void GalleryPopup::addEntry(int id, const QIcon &icon, const QString &tooltip)
+void GalleryPopup::addEntry(int id, const QIcon &preview, const QString &text)
 {
-    auto *button = new QToolButton;
-    button->setIcon(icon);
-    button->setIconSize(QSize(30, 30));
-    button->setToolTip(tooltip);
-    button->setAutoRaise(true);
-    button->setCheckable(true);
-    button->setFixedSize(38, 38);
-
-    const int index = m_count++;
-    m_grid->addWidget(button, index / m_columns, index % m_columns);
-    m_buttons.append(button);
+    auto *row = new GalleryRow(id, text, preview);
+    m_rows->addWidget(row);
+    m_items.append(row);
     m_ids.append(id);
 
-    connect(button, &QToolButton::clicked, this, [this, id]() {
-        setCurrentEntry(id);
-        emit entrySelected(id);
+    connect(row, &GalleryRow::clicked, this, [this](int chosen) {
+        setCurrentEntry(chosen);
+        emit entrySelected(chosen);
         close();
     });
 }
@@ -163,23 +246,15 @@ void GalleryPopup::addEntry(int id, const QIcon &icon, const QString &tooltip)
 void GalleryPopup::setCurrentEntry(int id)
 {
     m_current = id;
-    for (int i = 0; i < m_buttons.size(); ++i)
-        m_buttons[i]->setChecked(m_ids[i] == id);
+    for (int i = 0; i < m_items.size(); ++i)
+        m_items[i]->setChecked(m_ids[i] == id);
 }
 
-void GalleryPopup::updateEntryIcon(int id, const QIcon &icon)
+void GalleryPopup::updateEntryIcon(int id, const QIcon &preview)
 {
     const int index = m_ids.indexOf(id);
     if (index >= 0)
-        m_buttons[index]->setIcon(icon);
-}
-
-QIcon GalleryPopup::entryIcon(int id) const
-{
-    const int index = m_ids.indexOf(id);
-    if (index < 0)
-        return QIcon();
-    return m_buttons[index]->icon();
+        m_items[index]->setPreview(preview);
 }
 
 // --- фабрики кнопок ------------------------------------------------------

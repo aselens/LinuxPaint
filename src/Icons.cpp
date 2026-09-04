@@ -429,6 +429,40 @@ QIcon brush(BrushType id, int size)
     return QIcon(pm);
 }
 
+QIcon brushSample(BrushType id, const QSize &size)
+{
+    QImage img(size, QImage::Format_ARGB32);
+    img.fill(Qt::transparent);
+
+    // Волна, как в Paint: подъём, спад и снова подъём. По одной дуге видно
+    // и толщину, и текстуру, и то, как кисть ведёт себя на повороте.
+    const double left = 8.0;
+    const double right = size.width() - 8.0;
+    const double span = right - left;
+    const double middle = size.height() / 2.0;
+    const double swing = size.height() * 0.30;
+
+    QPainterPath path;
+    path.moveTo(left, middle + swing);
+    path.cubicTo(left + span * 0.28, middle - swing * 2.4,
+                 left + span * 0.72, middle + swing * 2.4,
+                 right, middle - swing);
+
+    // Мазок наносим не одной линией, а короткими отрезками вдоль дуги:
+    // текстурным кистям нужен ход пера, иначе от них останется ровная полоса.
+    const StrokeStyle style = strokeStyleForBrush(id);
+    const int steps = 56;
+    quint32 phase = 0;
+    QPointF previous = path.pointAtPercent(0.0);
+    for (int i = 1; i <= steps; ++i) {
+        const QPointF point = path.pointAtPercent(double(i) / steps);
+        paintutil::drawStroke(img, previous, point, g_foreground, 7, style, true, phase);
+        previous = point;
+    }
+
+    return QIcon(QPixmap::fromImage(img));
+}
+
 QIcon shape(ShapeType id, int size)
 {
     QPixmap pm = makePixmap(size);
