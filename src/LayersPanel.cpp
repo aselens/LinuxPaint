@@ -17,6 +17,18 @@ const int kThumbWidth = 84;
 const int kThumbHeight = 62;
 const int kEyeSize = 18;
 
+// Раскладка панели: поля по краям, высота кнопки «добавить слой»,
+// отступ между элементами. Из этих же чисел считается высота панели.
+const int kPanelMargin = 8;
+const int kButtonHeight = 28;
+const int kItemGap = 6;
+
+// Сколько миниатюр помещается в панель, прежде чем список начнёт
+// прокручиваться. Нижняя граница не даёт панели схлопнуться в один
+// квадратик при единственном слое, верхняя — вытянуться во всё окно.
+const int kMinRows = 2;
+const int kMaxRows = 6;
+
 // Шахматка, сквозь которую видно прозрачные места слоя.
 void drawCheckerboard(QPainter &p, const QRect &rect)
 {
@@ -123,13 +135,13 @@ LayersPanel::LayersPanel(Document *document, QWidget *parent)
     setFixedWidth(kThumbWidth + 30);
 
     auto *root = new QVBoxLayout(this);
-    root->setContentsMargins(8, 8, 8, 8);
-    root->setSpacing(8);
+    root->setContentsMargins(kPanelMargin, kPanelMargin, kPanelMargin, kPanelMargin);
+    root->setSpacing(kPanelMargin);
 
     m_addButton = new QToolButton(this);
     m_addButton->setAutoRaise(true);
     m_addButton->setIconSize(QSize(20, 20));
-    m_addButton->setFixedHeight(28);
+    m_addButton->setFixedHeight(kButtonHeight);
     m_addButton->setToolTip(tr("Добавить слой"));
     m_addButton->setIcon(Icons::action(Icons::Action::AddLayer));
     root->addWidget(m_addButton, 0, Qt::AlignHCenter);
@@ -142,7 +154,7 @@ LayersPanel::LayersPanel(Document *document, QWidget *parent)
     auto *host = new QWidget(scroll);
     m_itemsLayout = new QVBoxLayout(host);
     m_itemsLayout->setContentsMargins(0, 0, 0, 0);
-    m_itemsLayout->setSpacing(6);
+    m_itemsLayout->setSpacing(kItemGap);
     m_itemsLayout->addStretch(1);
     scroll->setWidget(host);
 
@@ -196,6 +208,23 @@ void LayersPanel::refresh()
     }
 
     m_itemsLayout->addStretch(1);
+    updateHeight();
+}
+
+void LayersPanel::updateHeight()
+{
+    // Панель занимала всю высоту рабочей области — при одном-двух слоях
+    // это был длинный почти пустой столбец. Теперь высота считается по
+    // содержимому: сколько слоёв, столько и места, а сверх шести список
+    // прокручивается внутри.
+    const int rows = qBound(kMinRows, m_document->layerCount(), kMaxRows);
+    const int itemHeight = kThumbHeight + 8;
+
+    setFixedHeight(kPanelMargin                             // поле сверху
+                   + kButtonHeight                          // кнопка «добавить»
+                   + kPanelMargin                           // отступ до списка
+                   + rows * itemHeight + (rows - 1) * kItemGap
+                   + kPanelMargin);                         // поле снизу
 }
 
 void LayersPanel::showItemMenu(int index, const QPoint &globalPos)
