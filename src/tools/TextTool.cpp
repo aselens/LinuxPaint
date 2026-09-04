@@ -48,6 +48,13 @@ void TextTool::createEditor(const QRect &box)
     m_editor->document()->setDocumentMargin(2);
     m_editor->setAcceptRichText(false);
 
+    // Редактор новый — про него ничего не применено. Без сброса viewChanged()
+    // решил бы, что шрифт и цвет уже на месте (они остались от прошлой
+    // надписи), и вторая надпись подряд осталась бы вовсе без формата.
+    m_appliedFont = QFont();
+    m_appliedColor = QColor();
+    m_appliedScale = 0.0;
+
     // Набранное перестало влезать — рамка едет вниз сама, как в Paint.
     // Редактор указан контекстом связи: она исчезнет вместе с ним.
     QObject::connect(m_editor->document(), &QTextDocument::contentsChanged,
@@ -226,15 +233,34 @@ void TextTool::viewChanged()
         scaled.setPointSizeF(scaledSize);
         m_editor->document()->setDefaultFont(scaled);
 
-        const QTextCursor saved = m_editor->textCursor();
-        m_editor->selectAll();
-        m_editor->setFontFamily(settings().font.family());
-        m_editor->setFontPointSize(scaledSize);
-        m_editor->setFontWeight(settings().font.bold() ? QFont::Bold : QFont::Normal);
-        m_editor->setFontItalic(settings().font.italic());
-        m_editor->setFontUnderline(settings().font.underline());
-        m_editor->setTextColor(settings().color1);
-        m_editor->setTextCursor(saved);
+        // Цвет задаём и через таблицу стилей: пока документ пуст, формата
+        // символов ещё нет, и текст брался бы из палитры темы — в тёмной
+        // теме это светло-серый, на белом холсте почти невидимый.
+        m_editor->setStyleSheet(
+            QStringLiteral("QTextEdit { background: transparent; color: %1; }")
+                .arg(settings().color1.name(QColor::HexRgb)));
+
+        QTextCharFormat format;
+        format.setFont(scaled);
+        format.setForeground(settings().color1);
+
+        // Запоминаем положение курсора числами, а не самим курсором: у него
+        // с собой формат символов, и восстановление курсора возвращало бы
+        // старый формат — цвет, только что назначенный для набора, пропадал.
+        QTextCursor caret = m_editor->textCursor();
+        const int anchor = caret.anchor();
+        const int position = caret.position();
+
+        QTextCursor whole(m_editor->document());
+        whole.select(QTextCursor::Document);
+        whole.mergeCharFormat(format);
+
+        caret.setPosition(anchor);
+        caret.setPosition(position, QTextCursor::KeepAnchor);
+        m_editor->setTextCursor(caret);
+
+        // А это — формат для того, что наберут дальше.
+        m_editor->setCurrentCharFormat(format);
 
         m_appliedFont = settings().font;
         m_appliedColor = settings().color1;
