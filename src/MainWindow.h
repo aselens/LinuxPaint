@@ -64,6 +64,7 @@ protected:
     void closeEvent(QCloseEvent *event) override;
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dropEvent(QDropEvent *event) override;
+    void moveEvent(QMoveEvent *event) override;
 
 private slots:
     // файл
@@ -217,6 +218,7 @@ private:
     QToolButton *m_opaqueTextButton = nullptr;
 
     Backdrop *m_backdrop = nullptr;
+    Backdrop *m_statusBackdrop = nullptr;   // отдельная — под строкой состояния
     QWidget *m_topBar = nullptr;
     QToolButton *m_settingsButton = nullptr;
     QVector<QToolButton *> m_shapeButtons;   // сетка фигур прямо в ленте

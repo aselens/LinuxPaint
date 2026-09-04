@@ -30,6 +30,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QMoveEvent>
 #include <QUrl>
 #include <QPainter>
 #include <QPrintDialog>
@@ -1154,6 +1155,15 @@ void MainWindow::createCentralArea()
 
 void MainWindow::createStatusBar()
 {
+    // Строка состояния живёт вне центрального виджета, до неё подложка
+    // рабочей области не достаёт — а сквозь прозрачный фон проступала бы
+    // ровная заливка окна, то есть та же серая полоса, только темнее. Поэтому
+    // кладём под неё вторую подложку. Обои привязаны к экрану, так что стык
+    // с рабочей областью получается незаметным. Верхний пиксель оставляем
+    // строке состояния — там проходит разделительная черта.
+    m_statusBackdrop = new Backdrop(statusBar());
+    m_statusBackdrop->followParent(QMargins(0, 1, 0, 0));
+
     // Каждый показатель — значок плюс короткий текст, без поясняющих слов.
     auto makeIcon = [this]() {
         auto *label = new QLabel(this);
@@ -1211,16 +1221,21 @@ void MainWindow::createStatusBar()
     statusBar()->addPermanentWidget(m_zoomSlider);
     statusBar()->addPermanentWidget(smallActionButton(m_zoomInAction));
 
+    // Виджеты добавлялись после подложки и уже стоят поверх неё, но порядок
+    // здесь важен настолько, что лучше закрепить его явно.
+    m_statusBackdrop->lower();
+
     clearCursorLabel();
     updateSelectionLabel(QSize());
 }
 
 void MainWindow::refreshBackdrop()
 {
-    if (!m_backdrop)
-        return;
-
-    m_backdrop->setTint(Theme::backdropTint());
+    const QColor tint = Theme::backdropTint();
+    if (m_backdrop)
+        m_backdrop->setTint(tint);
+    if (m_statusBackdrop)
+        m_statusBackdrop->setTint(tint);
 }
 
 void MainWindow::applyIcons()
@@ -1786,6 +1801,19 @@ void MainWindow::dropEvent(QDropEvent *event)
         m_canvas->pasteFromClipboard();
         event->acceptProposedAction();
     }
+}
+
+void MainWindow::moveEvent(QMoveEvent *event)
+{
+    QMainWindow::moveEvent(event);
+
+    // Обои привязаны к рабочему столу, а не к окну: сдвинулось окно — под ним
+    // оказался другой участок картинки. Дочерние виджеты о переезде окна не
+    // узнают, поэтому перерисовку запускаем отсюда, разом для всего окна.
+    if (m_backdrop)
+        m_backdrop->update();
+    if (m_statusBackdrop)
+        m_statusBackdrop->update();
 }
 
 void MainWindow::loadSettings()

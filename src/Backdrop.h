@@ -1,7 +1,7 @@
 #pragma once
 
 #include <QColor>
-#include <QImage>
+#include <QMargins>
 #include <QWidget>
 
 // Подложка окна: обои Windows 11, размытые до цветовых пятен и подкрашенные
@@ -28,13 +28,25 @@ public:
     // Цвет подкраски; его альфа задаёт, насколько сильно приглушить обои.
     void setTint(const QColor &tint);
 
+    // Превращает подложку в фон своего родителя: она сама растягивается по
+    // нему при каждом изменении размера и уходит под все остальные виджеты.
+    // Нужно там, где подложку нельзя вставить в раскладку, — например под
+    // строкой состояния, которой распоряжается QMainWindow.
+    //
+    // inset отступает от краёв родителя. У строки состояния сверху проходит
+    // разделительная черта, и её пиксель подложка должна оставить в покое.
+    void followParent(const QMargins &inset = QMargins());
+
 protected:
     void paintEvent(QPaintEvent *event) override;
     void moveEvent(QMoveEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     void rebuild();
+    void fitToParent();
 
     QColor m_tint;
-    QImage m_backdrop;      // во весь экран, в координатах рабочего стола
+    QMargins m_inset;
+    bool m_followParent = false;
 };

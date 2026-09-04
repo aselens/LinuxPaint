@@ -1,9 +1,20 @@
 #include "Backdrop.h"
 #include "WallpaperData.h"
 
+#include <QEvent>
 #include <QGuiApplication>
 #include <QPainter>
 #include <QScreen>
+
+namespace {
+
+// Готовая картинка одна на все подложки в окне. Их несколько — под рабочей
+// областью и под строкой состояния, — но участок рабочего стола они делят
+// один и тот же, и держать по копии во весь экран у каждой незачем.
+QImage g_backdrop;
+QColor g_backdropTint;
+
+}   // namespace
 
 Backdrop::Backdrop(QWidget *parent)
     : QWidget(parent)
@@ -15,8 +26,37 @@ void Backdrop::setTint(const QColor &tint)
     if (m_tint == tint)
         return;
     m_tint = tint;
-    m_backdrop = QImage();      // пересоберётся при следующей отрисовке
     update();
+}
+
+void Backdrop::followParent(const QMargins &inset)
+{
+    QWidget *host = parentWidget();
+    if (!host)
+        return;
+
+    m_inset = inset;
+    m_followParent = true;
+
+    host->installEventFilter(this);
+    fitToParent();
+    // Виджеты, добавленные позже, встают поверх — но полагаться на это нельзя,
+    // поэтому явно опускаем подложку на самое дно.
+    lower();
+    show();
+}
+
+void Backdrop::fitToParent()
+{
+    if (const QWidget *host = parentWidget())
+        setGeometry(host->rect().marginsRemoved(m_inset));
+}
+
+bool Backdrop::eventFilter(QObject *watched, QEvent *event)
+{
+    if (m_followParent && watched == parentWidget() && event->type() == QEvent::Resize)
+        fitToParent();
+    return QWidget::eventFilter(watched, event);
 }
 
 void Backdrop::rebuild()
@@ -53,7 +93,8 @@ void Backdrop::rebuild()
         painter.end();
     }
 
-    m_backdrop = image;
+    g_backdrop = image;
+    g_backdropTint = m_tint;
 }
 
 void Backdrop::paintEvent(QPaintEvent *event)
@@ -71,10 +112,12 @@ void Backdrop::paintEvent(QPaintEvent *event)
         return;
     }
 
-    if (m_backdrop.isNull() || m_backdrop.size() != screen->geometry().size())
+    if (g_backdrop.isNull() || g_backdrop.size() != screen->geometry().size()
+        || g_backdropTint != m_tint) {
         rebuild();
+    }
 
-    if (m_backdrop.isNull()) {
+    if (g_backdrop.isNull()) {
         painter.fillRect(rect(), QColor(0x1B, 0x1D, 0x23));
         return;
     }
@@ -87,10 +130,10 @@ void Backdrop::paintEvent(QPaintEvent *event)
 
     // Окно может уехать за пределы экрана — там картинки нет, поэтому
     // прижимаем вырезаемый участок к её границам.
-    source.moveLeft(qBound(0, source.left(), qMax(0, m_backdrop.width() - source.width())));
-    source.moveTop(qBound(0, source.top(), qMax(0, m_backdrop.height() - source.height())));
+    source.moveLeft(qBound(0, source.left(), qMax(0, g_backdrop.width() - source.width())));
+    source.moveTop(qBound(0, source.top(), qMax(0, g_backdrop.height() - source.height())));
 
-    painter.drawImage(rect(), m_backdrop, source);
+    painter.drawImage(rect(), g_backdrop, source);
 }
 
 void Backdrop::moveEvent(QMoveEvent *event)
