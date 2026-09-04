@@ -1124,10 +1124,10 @@ void MainWindow::createCentralArea()
     grid->addWidget(m_horizontalRuler, 0, 2);
     grid->addWidget(m_verticalRuler, 1, 1);
     grid->addWidget(m_scrollArea, 1, 2);
-    // Высота панели слоёв теперь считается по их числу, а не растягивается
-    // на всю рабочую область. Оставшееся место снизу свободно, и без явного
-    // прижатия к верху сетка поставила бы панель по центру столбца.
-    grid->addWidget(m_layersPanel, 0, 3, 2, 1, Qt::AlignTop);
+    // Панель слоёв больше не растягивается на всю рабочую область: её высота
+    // задана, а свободное место столбца остаётся и сверху, и снизу — панель
+    // стоит посередине, не доставая ни до ленты, ни до строки состояния.
+    grid->addWidget(m_layersPanel, 0, 3, 2, 1, Qt::AlignVCenter);
 
     // Линейки выключены по умолчанию — их состояние задаёт действие в меню.
     const bool showRulers = m_rulersAction->isChecked();
