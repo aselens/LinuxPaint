@@ -8,6 +8,26 @@
 #include <QTextCursor>
 #include <QTextDocument>
 #include <QTextEdit>
+#include <QtMath>
+
+namespace {
+
+// Насколько рамка отстоит от текста, в экранных пикселях. Этот зазор — то
+// самое место, куда не дотягивается редактор, и потому единственное, где
+// мышь достаётся холсту.
+const int kFramePad = 6;
+
+// Сторона маркера. Меньше зазора вдвое с запасом: иначе маркер наползёт
+// на редактор и перестанет нажиматься.
+const int kGripSize = 7;
+
+const QColor kFrameColour(0x00, 0x78, 0xD4);
+
+// Минимальная ширина рамки в пикселях изображения. Высоту считаем от шрифта:
+// схлопнуть рамку тоньше строки бессмысленно.
+const int kMinWidth = 24;
+
+}   // namespace
 
 TextTool::~TextTool()
 {
@@ -28,6 +48,11 @@ void TextTool::createEditor(const QRect &box)
     m_editor->document()->setDocumentMargin(2);
     m_editor->setAcceptRichText(false);
 
+    // Набранное перестало влезать — рамка едет вниз сама, как в Paint.
+    // Редактор указан контекстом связи: она исчезнет вместе с ним.
+    QObject::connect(m_editor->document(), &QTextDocument::contentsChanged,
+                     m_editor, [this] { growToFit(); });
+
     viewChanged();
     m_editor->show();
     m_editor->setFocus(Qt::MouseFocusReason);
@@ -40,6 +65,8 @@ void TextTool::destroyEditor()
     m_editor->hide();
     m_editor->deleteLater();
     m_editor = nullptr;
+    m_grip = Grip::None;
+    m_hoverGrip = Grip::None;
 }
 
 void TextTool::syncEditorGeometry()
@@ -48,6 +75,132 @@ void TextTool::syncEditorGeometry()
         return;
     m_editor->setGeometry(m_canvas->imageRectToWidget(m_box));
 }
+
+void TextTool::growToFit()
+{
+    if (!m_editor || m_grip != Grip::None)
+        return;
+
+    // Высота документа считается в экранных пикселях, а рамка живёт
+    // в пикселях изображения — приводим к общему масштабу.
+    const double zoom = m_canvas->zoom() > 0 ? m_canvas->zoom() : 1.0;
+    const int needed = qCeil(m_editor->document()->size().height() / zoom) + 2;
+    if (needed <= m_box.height())
+        return;
+
+    m_box.setHeight(needed);
+    syncEditorGeometry();
+    requestRepaint();
+}
+
+// --- рамка и маркеры -----------------------------------------------------
+
+QRect TextTool::frameRect() const
+{
+    return m_canvas->imageRectToWidget(m_box)
+        .adjusted(-kFramePad, -kFramePad, kFramePad, kFramePad);
+}
+
+QRect TextTool::gripRect(const QPoint &centre) const
+{
+    return QRect(centre.x() - kGripSize / 2, centre.y() - kGripSize / 2,
+                 kGripSize, kGripSize);
+}
+
+TextTool::Grip TextTool::gripAt(const QPoint &widgetPos) const
+{
+    if (!m_editor)
+        return Grip::None;
+
+    const QRect frame = frameRect();
+    const QPoint centre = frame.center();
+
+    const struct { Grip grip; QPoint at; } grips[] = {
+        { Grip::TopLeft,     frame.topLeft() },
+        { Grip::Top,         QPoint(centre.x(), frame.top()) },
+        { Grip::TopRight,    frame.topRight() },
+        { Grip::Right,       QPoint(frame.right(), centre.y()) },
+        { Grip::BottomRight, frame.bottomRight() },
+        { Grip::Bottom,      QPoint(centre.x(), frame.bottom()) },
+        { Grip::BottomLeft,  frame.bottomLeft() },
+        { Grip::Left,        QPoint(frame.left(), centre.y()) },
+    };
+
+    for (const auto &g : grips) {
+        if (gripRect(g.at).contains(widgetPos))
+            return g.grip;
+    }
+
+    // Мимо маркеров, но в пределах рамки — значит, по её полю: тянем целиком.
+    if (frame.contains(widgetPos))
+        return Grip::Move;
+
+    return Grip::None;
+}
+
+QRect TextTool::boxForGrip(Grip grip, const QPointF &pos) const
+{
+    // Тянуть рамку за пределы холста незачем — ограничиваем саму точку,
+    // тогда и рамка никуда не денется.
+    const QRect limits = doc()->image().rect();
+    const QPoint p(qBound(limits.left(), qRound(pos.x()), limits.right()),
+                   qBound(limits.top(), qRound(pos.y()), limits.bottom()));
+
+    QRect box = m_gripBox;
+
+    if (grip == Grip::Move) {
+        box.translate(p - m_gripStart.toPoint());
+        // Целиком уехать за край не даём: подпираем рамку границами холста.
+        if (box.right() > limits.right())
+            box.moveRight(limits.right());
+        if (box.bottom() > limits.bottom())
+            box.moveBottom(limits.bottom());
+        if (box.left() < limits.left())
+            box.moveLeft(limits.left());
+        if (box.top() < limits.top())
+            box.moveTop(limits.top());
+        return box;
+    }
+
+    switch (grip) {
+    case Grip::TopLeft:     box.setTopLeft(p);      break;
+    case Grip::Top:         box.setTop(p.y());      break;
+    case Grip::TopRight:    box.setTopRight(p);     break;
+    case Grip::Right:       box.setRight(p.x());    break;
+    case Grip::BottomRight: box.setBottomRight(p);  break;
+    case Grip::Bottom:      box.setBottom(p.y());   break;
+    case Grip::BottomLeft:  box.setBottomLeft(p);   break;
+    case Grip::Left:        box.setLeft(p.x());     break;
+    default:                                        break;
+    }
+
+    // Схлопывать рамку в точку нельзя: подпираем ту сторону, которую тянут,
+    // а противоположную оставляем на месте.
+    const QFontMetrics metrics(settings().font);
+    const int minHeight = metrics.height() + 4;
+
+    const bool movesLeft = grip == Grip::Left || grip == Grip::TopLeft
+                           || grip == Grip::BottomLeft;
+    const bool movesTop = grip == Grip::Top || grip == Grip::TopLeft
+                          || grip == Grip::TopRight;
+
+    if (box.width() < kMinWidth) {
+        if (movesLeft)
+            box.setLeft(box.right() - kMinWidth + 1);
+        else
+            box.setRight(box.left() + kMinWidth - 1);
+    }
+    if (box.height() < minHeight) {
+        if (movesTop)
+            box.setTop(box.bottom() - minHeight + 1);
+        else
+            box.setBottom(box.top() + minHeight - 1);
+    }
+
+    return box;
+}
+
+// --- вид -----------------------------------------------------------------
 
 void TextTool::viewChanged()
 {
@@ -97,9 +250,20 @@ void TextTool::press(const QPointF &pos, Qt::MouseButton button, Qt::KeyboardMod
     if (button != Qt::LeftButton)
         return;
 
-    // Клик пришёл в холст, а не в редактор — значит, мимо рамки: фиксируем.
-    if (m_editor)
+    if (m_editor) {
+        // Клик по рамке — берёмся за неё, а не начинаем новую надпись.
+        const Grip grip = gripAt(m_canvas->imageToWidget(pos));
+        if (grip != Grip::None) {
+            m_grip = grip;
+            m_gripBox = m_box;
+            m_gripStart = pos;
+            m_active = true;
+            return;
+        }
+
+        // Мимо рамки — значит, набор закончен.
         commit();
+    }
 
     m_origin = pos;
     m_dragging = true;
@@ -111,8 +275,27 @@ void TextTool::press(const QPointF &pos, Qt::MouseButton button, Qt::KeyboardMod
 void TextTool::move(const QPointF &pos, Qt::KeyboardModifiers mods)
 {
     Q_UNUSED(mods)
-    if (!m_dragging)
+
+    if (m_grip != Grip::None) {
+        m_box = boxForGrip(m_grip, pos);
+        syncEditorGeometry();
+        requestRepaint();
         return;
+    }
+
+    if (!m_dragging) {
+        // Подсказываем видом курсора, что рамку можно тянуть. Холст ставит
+        // курсор инструмента перед этим вызовом, так что последнее слово наше.
+        if (m_editor) {
+            const Grip hover = gripAt(m_canvas->imageToWidget(pos));
+            if (hover != m_hoverGrip) {
+                m_hoverGrip = hover;
+                m_canvas->setCursor(cursor());
+            }
+        }
+        return;
+    }
+
     m_box = QRectF(m_origin, pos).normalized().toAlignedRect();
     requestRepaint();
 }
@@ -120,6 +303,16 @@ void TextTool::move(const QPointF &pos, Qt::KeyboardModifiers mods)
 void TextTool::release(const QPointF &pos, Qt::MouseButton button, Qt::KeyboardModifiers mods)
 {
     Q_UNUSED(button) Q_UNUSED(mods)
+
+    if (m_grip != Grip::None) {
+        m_grip = Grip::None;
+        m_active = false;
+        // Пока рамку тянули, дорастить её под текст было нельзя — теперь можно.
+        growToFit();
+        requestRepaint();
+        return;
+    }
+
     if (!m_dragging)
         return;
 
@@ -149,21 +342,82 @@ void TextTool::paintOverlay(QPainter &painter)
     if (!m_dragging && !m_editor)
         return;
 
-    painter.save();
-    if (m_editor && settings().textOpaque)
+    // Подложка под текстом ложится ровно по рамке, поэтому рисуется
+    // в координатах изображения — вместе с холстом.
+    if (m_editor && settings().textOpaque) {
+        painter.save();
         painter.fillRect(m_box, settings().color2);
+        painter.restore();
+    }
 
-    QPen pen(QColor(0, 120, 215));
-    pen.setCosmetic(true);
+    if (!m_editor) {
+        // Рамку ещё только тянут: она совпадает с будущим полем текста.
+        painter.save();
+        QPen pen(kFrameColour);
+        pen.setCosmetic(true);
+        pen.setStyle(Qt::DashLine);
+        painter.setPen(pen);
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRect(m_box);
+        painter.restore();
+        return;
+    }
+
+    // Рамка и маркеры набранного текста — в экранных пикселях: их размер
+    // не должен зависеть от масштаба холста.
+    painter.save();
+    painter.resetTransform();
+    painter.setRenderHint(QPainter::Antialiasing, false);
+
+    const QRect frame = frameRect();
+
+    QPen pen(kFrameColour);
+    pen.setWidth(1);
     pen.setStyle(Qt::DashLine);
     painter.setPen(pen);
     painter.setBrush(Qt::NoBrush);
-    painter.drawRect(m_box);
+    painter.drawRect(frame);
+
+    const QPoint centre = frame.center();
+    const QPoint points[] = {
+        frame.topLeft(),
+        QPoint(centre.x(), frame.top()),
+        frame.topRight(),
+        QPoint(frame.right(), centre.y()),
+        frame.bottomRight(),
+        QPoint(centre.x(), frame.bottom()),
+        frame.bottomLeft(),
+        QPoint(frame.left(), centre.y()),
+    };
+
+    painter.setPen(QPen(kFrameColour, 1));
+    painter.setBrush(Qt::white);
+    for (const QPoint &p : points)
+        painter.drawRect(gripRect(p));
+
     painter.restore();
 }
 
 QCursor TextTool::cursor() const
 {
+    switch (m_hoverGrip) {
+    case Grip::Move:
+        return QCursor(Qt::SizeAllCursor);
+    case Grip::Top:
+    case Grip::Bottom:
+        return QCursor(Qt::SizeVerCursor);
+    case Grip::Left:
+    case Grip::Right:
+        return QCursor(Qt::SizeHorCursor);
+    case Grip::TopLeft:
+    case Grip::BottomRight:
+        return QCursor(Qt::SizeFDiagCursor);
+    case Grip::TopRight:
+    case Grip::BottomLeft:
+        return QCursor(Qt::SizeBDiagCursor);
+    case Grip::None:
+        break;
+    }
     return QCursor(Qt::IBeamCursor);
 }
 
