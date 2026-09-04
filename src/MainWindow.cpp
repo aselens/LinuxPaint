@@ -39,6 +39,8 @@
 #include <QScrollBar>
 #include <QSet>
 #include <QSettings>
+#include <QStyledItemDelegate>
+#include <QAbstractItemView>
 #include <QSlider>
 #include <QSpinBox>
 #include <QStatusBar>
@@ -921,8 +923,14 @@ void MainWindow::createRibbon()
 
     m_fontCombo = new QComboBox;
     m_fontCombo->setFixedWidth(150);
-    m_fontCombo->setMaxVisibleItems(20);
+    m_fontCombo->setMaxVisibleItems(14);
+    // Обычный делегат вместо того, что QComboBox ставит сам: только с ним
+    // строки списка слушаются правил из таблицы стилей.
+    m_fontCombo->setItemDelegate(new QStyledItemDelegate(m_fontCombo));
     fillFontCombo();
+    // Названия шрифтов длиннее самого поля, поэтому окошко списка шире его.
+    m_fontCombo->view()->setMinimumWidth(240);
+    m_fontCombo->view()->setTextElideMode(Qt::ElideRight);
     m_textGroup->addItem(m_fontCombo);
 
     m_fontSizeCombo = new QComboBox;

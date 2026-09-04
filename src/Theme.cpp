@@ -315,13 +315,39 @@ QComboBox, QSpinBox, QLineEdit, QDoubleSpinBox {
 }
 QComboBox:hover, QSpinBox:hover, QLineEdit:hover { border: 1px solid %ACCENT%; }
 QComboBox::drop-down { border: none; width: 18px; }
+/* Список раскрывается не системным меню во весь экран, а собственным
+   окошком: только так соблюдается заданное число видимых строк и работает
+   прокрутка — иначе список шрифтов растянулся бы на всю высоту экрана. */
+QComboBox { combobox-popup: 0; }
 QComboBox QAbstractItemView {
     background: %SURFACE%;
     border: 1px solid %BORDER%;
-    border-radius: 6px;
+    border-radius: 8px;
+    padding: 4px;
     selection-background-color: %HOVER%;
     selection-color: %TEXT%;
     outline: none;
+}
+/* Строки списка — с полями и скруглением, как пункты меню. Работает только
+   с обычным делегатом отрисовки; тот, что QComboBox ставит по умолчанию,
+   рисует строки под пункты меню и эти правила пропускает. */
+QComboBox QAbstractItemView::item {
+    min-height: 26px;
+    padding: 2px 8px;
+    border-radius: 5px;
+    color: %TEXT%;
+}
+QComboBox QAbstractItemView::item:selected {
+    background: %HOVER%;
+    color: %TEXT%;
+}
+QComboBox QAbstractItemView QScrollBar:vertical {
+    width: 6px;
+    margin: 4px 2px;
+}
+QComboBox QAbstractItemView QScrollBar::handle:vertical {
+    border-radius: 3px;
+    margin: 0;
 }
 
 QCheckBox, QRadioButton, QLabel { color: %TEXT%; }
