@@ -16,6 +16,27 @@ endif()
 
 find_package(Qt6 6.2 REQUIRED COMPONENTS Widgets PrintSupport)
 
+# libmypaint — движок кистей MyPaint, он же в Krita и GIMP. Необязателен:
+# без него кисти рисует собственный движок, и сборка идёт как прежде.
+# Ставится пакетом libmypaint-dev.
+option(WITH_LIBMYPAINT "Использовать libmypaint для кистей, если она есть" ON)
+
+set(HAVE_LIBMYPAINT OFF)
+if(WITH_LIBMYPAINT)
+    find_package(PkgConfig QUIET)
+    if(PKG_CONFIG_FOUND)
+        pkg_check_modules(LIBMYPAINT QUIET libmypaint)
+        if(LIBMYPAINT_FOUND)
+            set(HAVE_LIBMYPAINT ON)
+            message(STATUS "libmypaint ${LIBMYPAINT_VERSION} найдена — кисти ведёт она")
+        endif()
+    endif()
+endif()
+if(NOT HAVE_LIBMYPAINT)
+    message(STATUS "libmypaint не найдена — кисти рисует собственный движок "
+                   "(поставить: sudo apt install libmypaint-dev)")
+endif()
+
 set(PAINT_SOURCES
     src/main.cpp
     src/Document.cpp
@@ -29,6 +50,7 @@ set(PAINT_SOURCES
     src/Theme.cpp
     src/Dialogs.cpp
     src/tools/Tool.cpp
+    src/tools/MyPaintEngine.cpp
     src/tools/PaintTools.cpp
     src/tools/ShapeTool.cpp
     src/tools/SelectTool.cpp
@@ -50,6 +72,7 @@ set(PAINT_HEADERS
     src/Theme.h
     src/Dialogs.h
     src/tools/Tool.h
+    src/tools/MyPaintEngine.h
     src/tools/PaintTools.h
     src/tools/ShapeTool.h
     src/tools/SelectTool.h
@@ -64,6 +87,13 @@ target_include_directories(linux-paint PRIVATE
 target_link_libraries(linux-paint PRIVATE
     Qt6::Widgets
     Qt6::PrintSupport)
+
+if(HAVE_LIBMYPAINT)
+    target_compile_definitions(linux-paint PRIVATE HAVE_LIBMYPAINT)
+    target_include_directories(linux-paint PRIVATE ${LIBMYPAINT_INCLUDE_DIRS})
+    target_link_libraries(linux-paint PRIVATE ${LIBMYPAINT_LIBRARIES})
+    target_link_directories(linux-paint PRIVATE ${LIBMYPAINT_LIBRARY_DIRS})
+endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(linux-paint PRIVATE -Wall -Wextra -Wno-unused-parameter)
@@ -125,6 +155,10 @@ set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 # Без qt6-qpa-plugins окно вообще не откроется, так что это жёсткая
 # зависимость.
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "qt6-qpa-plugins, hicolor-icon-theme")
+if(HAVE_LIBMYPAINT)
+    # Собрались с движком кистей — значит, он нужен и на машине пользователя.
+    string(APPEND CPACK_DEBIAN_PACKAGE_DEPENDS ", libmypaint-1.5-1 | libmypaint0")
+endif()
 
 # А вот модуль отрисовки SVG нужен только для логотипа: без него программа
 # работает и рисует запасной значок. В разных дистрибутивах он называется

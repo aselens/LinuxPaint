@@ -27,11 +27,34 @@ void PencilTool::press(const QPointF &pos, Qt::MouseButton button, Qt::KeyboardM
     // вызов ничего не делает и рисование идёт прямо в холст.
     m_canvas->beginStrokeLayer();
 
-    // Мазок начинается здесь и живёт до отпускания кнопки: карта покрытия
-    // общая на весь мазок, иначе перекрытия снова начали бы темнеть.
+    // Кисти ведёт libmypaint, если она есть в системе: у неё и сглаживание
+    // хода руки, и подхват цвета, и куда более тонкая работа с краем.
+    // Карандашу она не нужна — ему положена жёсткая линия без сглаживания.
+    const bool useMyPaint = smooth() && MyPaintEngine::isAvailable()
+                            && m_mypaint.begin(image(), strokeColor(), strokeWidth(),
+                                               style(), settings().antialias);
+    if (useMyPaint) {
+        m_clock.start();
+        touchStroke(m_mypaint.motion(image(), pos, 0.0));
+        return;
+    }
+
+    // Запасной движок. Мазок начинается здесь и живёт до отпускания кнопки:
+    // карта покрытия общая на весь мазок, иначе перекрытия темнели бы.
     m_stroke.begin(image().size(), strokeColor(), strokeWidth(), style(),
                    smooth() && settings().antialias);
     touchStroke(m_stroke.addSegment(image(), pos, pos));
+}
+
+void PencilTool::continueStroke(const QPointF &pos)
+{
+    if (m_mypaint.isActive()) {
+        // Время между точками движок принимает в секундах.
+        const double seconds = m_clock.restart() / 1000.0;
+        touchStroke(m_mypaint.motion(image(), pos, seconds));
+        return;
+    }
+    touchStroke(m_stroke.addSegment(image(), m_last, pos));
 }
 
 void PencilTool::touchStroke(const QRect &dirty)
@@ -59,7 +82,7 @@ void PencilTool::move(const QPointF &pos, Qt::KeyboardModifiers mods)
             target.setX(m_last.x());
     }
 
-    touchStroke(m_stroke.addSegment(image(), m_last, target));
+    continueStroke(target);
     m_last = target;
 }
 
@@ -68,6 +91,7 @@ void PencilTool::release(const QPointF &pos, Qt::MouseButton button, Qt::Keyboar
     if (!m_active)
         return;
     Tool::release(pos, button, mods);
+    m_mypaint.end();
     m_stroke.end();
     m_canvas->commitStrokeLayer();
     doc()->endEdit();
@@ -104,7 +128,7 @@ void BrushTool::tick()
         return;
     // Аэрограф копится: каждый тик добавляет краски в то же место, и пятно
     // постепенно набирает плотность — как у настоящего.
-    touchStroke(m_stroke.addSegment(image(), m_hover, m_hover));
+    continueStroke(m_hover);
 }
 
 // --- ластик --------------------------------------------------------------

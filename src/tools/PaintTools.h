@@ -1,6 +1,9 @@
 #pragma once
 
+#include "tools/MyPaintEngine.h"
 #include "tools/Tool.h"
+
+#include <QElapsedTimer>
 
 // Карандаш: жёсткая линия без сглаживания.
 class PencilTool : public Tool
@@ -21,10 +24,19 @@ protected:
     // Сообщает документу о задетой области, пропуская пустые.
     void touchStroke(const QRect &dirty);
 
+    // Ведёт очередную точку пути тем движком, который сейчас работает.
+    void continueStroke(const QPointF &pos);
+
     QPointF m_last;
     // Накопитель мазка: он и решает, как отпечатки складываются между
     // собой, поэтому живёт от нажатия до отпускания кнопки.
     paintutil::Stroke m_stroke;
+    // Если в системе есть libmypaint, кисти ведёт она, а m_stroke остаётся
+    // запасным движком. Карандашу движок кистей не нужен: ему положена
+    // жёсткая линия без сглаживания.
+    MyPaintEngine m_mypaint;
+    // Движку кистей важно, быстро вели мышью или медленно.
+    QElapsedTimer m_clock;
 };
 
 // Кисти: тот же обход, но стиль берётся из выбранной кисти.
