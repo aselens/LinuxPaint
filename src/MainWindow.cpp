@@ -1121,6 +1121,10 @@ void MainWindow::createCentralArea()
     // Отступ задан обёрткой, а не самой панелью: поля внутри виджета
     // подвинули бы содержимое, а укоротить нужно сам прямоугольник панели.
     m_layersColumn = new QWidget(this);
+    // Ширину обёртки закрепляем по её содержимому. Без этого столбец сетки,
+    // прежде несжимаемый из-за жёсткой ширины самой панели, стал растяжимым,
+    // забрал часть свободного места, и панель повисла посреди него.
+    m_layersColumn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
     auto *layersColumn = new QVBoxLayout(m_layersColumn);
     layersColumn->setContentsMargins(0, 0, 0, 24);
     layersColumn->setSpacing(0);
