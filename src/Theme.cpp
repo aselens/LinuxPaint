@@ -400,12 +400,21 @@ QToolButton#LayerEye:hover {
     background: %ACCENT%;
 }
 
+/* Строка состояния без собственного фона: от неё остаётся только тонкая
+   черта сверху, отделяющая её от рабочей области. Сплошная заливка делала
+   из неё отдельную серую панель, которой в Paint нет. */
 QStatusBar {
-    background: %SURFACE%;
-    border-top: 1px solid %BORDER%;
+    background: transparent;
+    border: none;
+    border-top: 1px solid %SEPARATOR%;
     color: %TEXT%;
 }
-QStatusBar QLabel { color: %TEXT%; }
+QStatusBar QLabel {
+    color: %TEXT%;
+    background: transparent;
+}
+/* Qt по умолчанию обводит каждый участок строки состояния рамкой —
+   она здесь лишняя. */
 QStatusBar::item { border: none; }
 
 /* Область вокруг холста — полупрозрачный слой, а не сплошная заливка:
