@@ -132,9 +132,9 @@ LayersPanel::LayersPanel(Document *document, QWidget *parent)
 {
     setObjectName(QStringLiteral("LayersPanel"));
     setAttribute(Qt::WA_StyledBackground, true);
-    // Ширина с запасом на узкую полосу прокрутки: слоёв почти всегда больше
-    // двух, полоса появляется сразу, и без запаса она срезала бы миниатюры.
-    setFixedWidth(kThumbWidth + 36);
+    // Ширины ровно хватает: за вычетом полей и узкой полосы прокрутки
+    // остаётся в точности ширина миниатюры, так что полоса ничего не режет.
+    setFixedWidth(kThumbWidth + 30);
 
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(kPanelMargin, kPanelMargin, kPanelMargin, kPanelMargin);
