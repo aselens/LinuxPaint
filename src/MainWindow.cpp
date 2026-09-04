@@ -1116,17 +1116,17 @@ void MainWindow::createCentralArea()
 
     m_layersPanel = new LayersPanel(m_document, this);
 
-    // Панель слоёв не доводим до низа рабочей области: её нижний край
-    // выровнен по колонке с ползунками, у которой такой же отступ снизу.
-    // Отступ задан обёрткой, а не самой панелью: поля внутри виджета
-    // подвинули бы содержимое, а укоротить нужно сам прямоугольник панели.
+    // Панель слоёв не доводим ни до верха, ни до низа рабочей области: её
+    // края выровнены по колонке с ползунками слева, у которой те же отступы.
+    // Заданы они обёрткой, а не самой панелью: поля внутри виджета подвинули
+    // бы содержимое, а укоротить нужно сам прямоугольник панели.
     m_layersColumn = new QWidget(this);
     // Ширину обёртки закрепляем по её содержимому. Без этого столбец сетки,
     // прежде несжимаемый из-за жёсткой ширины самой панели, стал растяжимым,
     // забрал часть свободного места, и панель повисла посреди него.
     m_layersColumn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
     auto *layersColumn = new QVBoxLayout(m_layersColumn);
-    layersColumn->setContentsMargins(0, 0, 0, 24);
+    layersColumn->setContentsMargins(0, 24, 0, 24);
     layersColumn->setSpacing(0);
     layersColumn->addWidget(m_layersPanel);
     m_layersColumn->setVisible(false);
