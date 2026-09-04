@@ -128,6 +128,8 @@ private:
     Ruler *m_verticalRuler = nullptr;
     QWidget *m_rulerCorner = nullptr;
     LayersPanel *m_layersPanel = nullptr;
+    // Обёртка панели слоёв: держит отступ снизу и прячется вместе с ней.
+    QWidget *m_layersColumn = nullptr;
 
     // статусная строка: у каждого показателя свой значок, как в Paint
     QLabel *m_cursorLabel = nullptr;

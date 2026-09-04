@@ -442,8 +442,10 @@ void MainWindow::createActions()
                             QKeySequence(QStringLiteral("Ctrl+Shift+L")));
 
     connect(m_layersAction, &QAction::toggled, this, [this](bool on) {
-        if (m_layersPanel)
-            m_layersPanel->setVisible(on);
+        // Прячем обёртку целиком: спрячь одну панель — и столбец сетки
+        // остался бы занятым её отступом.
+        if (m_layersColumn)
+            m_layersColumn->setVisible(on);
     });
     connect(m_addLayerAction, &QAction::triggered, this, [this] {
         m_canvas->finishSelection();
@@ -1113,7 +1115,17 @@ void MainWindow::createCentralArea()
     panelColumn->addWidget(toleranceBox.box, 1);
 
     m_layersPanel = new LayersPanel(m_document, this);
-    m_layersPanel->setVisible(false);
+
+    // Панель слоёв не доводим до низа рабочей области: её нижний край
+    // выровнен по колонке с ползунками, у которой такой же отступ снизу.
+    // Отступ задан обёрткой, а не самой панелью: поля внутри виджета
+    // подвинули бы содержимое, а укоротить нужно сам прямоугольник панели.
+    m_layersColumn = new QWidget(this);
+    auto *layersColumn = new QVBoxLayout(m_layersColumn);
+    layersColumn->setContentsMargins(0, 0, 0, 24);
+    layersColumn->setSpacing(0);
+    layersColumn->addWidget(m_layersPanel);
+    m_layersColumn->setVisible(false);
 
     auto *canvasArea = new QWidget(this);
     auto *grid = new QGridLayout(canvasArea);
@@ -1124,7 +1136,7 @@ void MainWindow::createCentralArea()
     grid->addWidget(m_horizontalRuler, 0, 2);
     grid->addWidget(m_verticalRuler, 1, 1);
     grid->addWidget(m_scrollArea, 1, 2);
-    grid->addWidget(m_layersPanel, 0, 3, 2, 1);
+    grid->addWidget(m_layersColumn, 0, 3, 2, 1);
 
     // Линейки выключены по умолчанию — их состояние задаёт действие в меню.
     const bool showRulers = m_rulersAction->isChecked();
