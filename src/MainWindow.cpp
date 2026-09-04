@@ -20,6 +20,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFontComboBox>
+#include <QFrame>
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QImageReader>
@@ -1161,6 +1162,19 @@ void MainWindow::createStatusBar()
         return label;
     };
 
+    // Раз фона у панели больше нет, блоки показателей разделяем волосяной
+    // чертой — как в Paint. Ширина 13 — это сама черта в 1 пиксель плюс по
+    // 6 пикселей воздуха с боков: отступы в стилях отсчитываются внутрь
+    // виджета, поэтому место под них нужно заложить в его размер.
+    auto makeDivider = [this]() {
+        auto *line = new QFrame(this);
+        line->setObjectName(QStringLiteral("StatusDivider"));
+        line->setFrameShape(QFrame::NoFrame);
+        line->setAttribute(Qt::WA_StyledBackground, true);
+        line->setFixedWidth(13);
+        return line;
+    };
+
     m_cursorIcon = makeIcon();
     m_selectionIcon = makeIcon();
     m_canvasSizeIcon = makeIcon();
@@ -1183,11 +1197,14 @@ void MainWindow::createStatusBar()
 
     statusBar()->addWidget(m_cursorIcon);
     statusBar()->addWidget(m_cursorLabel);
+    statusBar()->addWidget(makeDivider());
     statusBar()->addWidget(m_selectionIcon);
     statusBar()->addWidget(m_selectionLabel);
+    statusBar()->addWidget(makeDivider());
     statusBar()->addWidget(m_canvasSizeIcon);
     statusBar()->addWidget(m_sizeLabel);
 
+    statusBar()->addPermanentWidget(makeDivider());
     statusBar()->addPermanentWidget(smallActionButton(m_zoomFitAction));
     statusBar()->addPermanentWidget(m_zoomLabel);
     statusBar()->addPermanentWidget(smallActionButton(m_zoomOutAction));
