@@ -23,11 +23,11 @@ const int kPanelMargin = 8;
 const int kButtonHeight = 28;
 const int kItemGap = 6;
 
-// Сколько миниатюр помещается в панель, прежде чем список начнёт
-// прокручиваться. Нижняя граница не даёт панели схлопнуться в один
-// квадратик при единственном слое, верхняя — вытянуться во всё окно.
-const int kMinRows = 2;
-const int kMaxRows = 6;
+// Высота панели — ровно две миниатюры, сколько бы слоёв ни было: остальные
+// прокручиваются внутри. Число постоянное, а не по количеству слоёв, иначе
+// панель то и дело меняла бы длину, а при десятке слоёв вытягивалась бы
+// во всё окно — с этого и начались правки.
+const int kVisibleRows = 2;
 
 // Шахматка, сквозь которую видно прозрачные места слоя.
 void drawCheckerboard(QPainter &p, const QRect &rect)
@@ -132,7 +132,9 @@ LayersPanel::LayersPanel(Document *document, QWidget *parent)
 {
     setObjectName(QStringLiteral("LayersPanel"));
     setAttribute(Qt::WA_StyledBackground, true);
-    setFixedWidth(kThumbWidth + 30);
+    // Ширина с запасом на узкую полосу прокрутки: слоёв почти всегда больше
+    // двух, полоса появляется сразу, и без запаса она срезала бы миниатюры.
+    setFixedWidth(kThumbWidth + 36);
 
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(kPanelMargin, kPanelMargin, kPanelMargin, kPanelMargin);
@@ -147,6 +149,7 @@ LayersPanel::LayersPanel(Document *document, QWidget *parent)
     root->addWidget(m_addButton, 0, Qt::AlignHCenter);
 
     auto *scroll = new QScrollArea(this);
+    scroll->setObjectName(QStringLiteral("LayersList"));
     scroll->setWidgetResizable(true);
     scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     scroll->setFrameShape(QFrame::NoFrame);
@@ -213,11 +216,10 @@ void LayersPanel::refresh()
 
 void LayersPanel::updateHeight()
 {
-    // Панель занимала всю высоту рабочей области — при одном-двух слоях
-    // это был длинный почти пустой столбец. Теперь высота считается по
-    // содержимому: сколько слоёв, столько и места, а сверх шести список
-    // прокручивается внутри.
-    const int rows = qBound(kMinRows, m_document->layerCount(), kMaxRows);
+    // Панель занимала всю высоту рабочей области, из-за чего выглядела
+    // непомерно длинной. Теперь её длина задана в миниатюрах и не зависит
+    // ни от числа слоёв, ни от размеров окна.
+    const int rows = kVisibleRows;
     const int itemHeight = kThumbHeight + 8;
 
     setFixedHeight(kPanelMargin                             // поле сверху
