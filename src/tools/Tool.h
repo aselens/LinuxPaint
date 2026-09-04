@@ -4,7 +4,6 @@
 #include <QColor>
 #include <QCursor>
 #include <QFont>
-#include <QHash>
 #include <QImage>
 #include <QPainterPath>
 #include <QPointF>
@@ -146,15 +145,12 @@ public:
     bool isActive() const { return !m_mask.isNull(); }
 
 private:
-    const QImage &dabFor(double angleDegrees);
-
     QImage m_mask;                  // накопленное покрытие мазка, 8 бит
     QColor m_colour;
     int m_width = 1;
     StrokeStyle m_style = StrokeStyle::Solid;
     bool m_antialias = true;
     double m_carry = 0.0;           // остаток шага, перенесённый с прошлого отрезка
-    QHash<int, QImage> m_dabs;      // отпечатки по секторам направления
 };
 
 // Непрерывный штрих по точкам — тем же накопителем, что и Stroke.

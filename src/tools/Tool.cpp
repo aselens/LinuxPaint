@@ -4,7 +4,6 @@
 
 #include <QBrush>
 #include <QPainter>
-#include <QRandomGenerator>
 #include <QtMath>
 
 #include <utility>
@@ -41,11 +40,6 @@ StrokeStyle strokeStyleForFill(FillMode fill)
 
 namespace paintutil {
 namespace {
-
-inline double randomDouble()
-{
-    return QRandomGenerator::global()->generateDouble();
-}
 
 // --- отпечаток кисти -----------------------------------------------------
 
@@ -125,9 +119,14 @@ double dabOpacity(double rr, double hardness)
     return hardness * (1.0 - rr) / (1.0 - hardness);
 }
 
-// Быстрый шум по целым координатам. Нужен ровно один: воспроизводимый,
-// без состояния и без таблиц.
-inline double hashNoise(int x, int y, quint32 salt)
+inline double smoothstep(double from, double to, double value)
+{
+    const double t = qBound(0.0, (value - from) / (to - from), 1.0);
+    return t * t * (3.0 - 2.0 * t);
+}
+
+// Значение шума в узле решётки. Воспроизводимое, без состояния и таблиц.
+inline double latticeNoise(int x, int y, quint32 salt)
 {
     quint32 h = quint32(x) * 374761393u + quint32(y) * 668265263u + salt * 2246822519u;
     h ^= h >> 13;
@@ -136,54 +135,142 @@ inline double hashNoise(int x, int y, quint32 salt)
     return double(h & 0xFFFFu) / 65535.0;
 }
 
-double grainAt(Grain grain, int x, int y)
+// Гладкий шум: значения заданы в узлах решётки с шагом cell, между узлами —
+// плавный переход. Ровно этого не хватало прежней фактуре: она бралась от
+// целочисленного деления координат, то есть соседние пиксели получали одно
+// и то же значение блоками, и «зерно» разваливалось на квадратики.
+//
+// Решётка замкнута по кругу с периодом tile, поэтому готовую фактуру можно
+// разложить плиткой без швов.
+double smoothNoise(int x, int y, int cell, int tile, quint32 salt)
 {
-    switch (grain) {
-    case Grain::None:
-        return 1.0;
-    case Grain::Paper: {
-        // Три частоты сразу: мелкая рябь, средние комки, крупные пятна.
-        // Ниже порога краска не ложится вовсе — это впадины бумаги.
-        const double n = 0.45 * hashNoise(x, y, 1)
-                       + 0.35 * hashNoise(x / 2, y / 2, 2)
-                       + 0.20 * hashNoise(x / 5, y / 5, 3);
-        return n < 0.40 ? 0.0 : (n - 0.40) / 0.60;
-    }
-    case Grain::Graphite: {
-        const double n = 0.6 * hashNoise(x, y, 4) + 0.4 * hashNoise(x / 2, y / 2, 5);
-        return 0.30 + 0.70 * n;
-    }
-    case Grain::Wash: {
-        const double n = 0.5 * hashNoise(x / 3, y / 3, 6) + 0.5 * hashNoise(x / 7, y / 7, 7);
-        return 0.55 + 0.45 * n;
-    }
-    }
-    return 1.0;
+    const int period = qMax(1, tile / cell);
+
+    const double fx = double(x) / cell;
+    const double fy = double(y) / cell;
+    const int x0 = int(qFloor(fx));
+    const int y0 = int(qFloor(fy));
+
+    const double tx = smoothstep(0.0, 1.0, fx - x0);
+    const double ty = smoothstep(0.0, 1.0, fy - y0);
+
+    const int xa = ((x0 % period) + period) % period;
+    const int ya = ((y0 % period) + period) % period;
+    const int xb = (xa + 1) % period;
+    const int yb = (ya + 1) % period;
+
+    const double top = latticeNoise(xa, ya, salt)
+                     + (latticeNoise(xb, ya, salt) - latticeNoise(xa, ya, salt)) * tx;
+    const double bottom = latticeNoise(xa, yb, salt)
+                        + (latticeNoise(xb, yb, salt) - latticeNoise(xa, yb, salt)) * tx;
+    return top + (bottom - top) * ty;
 }
 
-// Готовит отпечаток: карта кроющей способности с мягким краем.
-QImage buildDab(const DabSpec &spec, int width, double angleDegrees, bool antialias)
+// Фактура считается один раз на плитку и дальше только читается: три октавы
+// гладкого шума на каждый пиксель мазка съели бы всё время отрисовки.
+const int kGrainTile = 512;
+
+QImage buildGrainTile(Grain grain)
 {
-    const double radius = qMax(0.5, width / 2.0) * spec.radiusScale;
+    QImage tile(kGrainTile, kGrainTile, QImage::Format_Grayscale8);
+    tile.fill(0);
+
+    for (int y = 0; y < kGrainTile; ++y) {
+        uchar *line = tile.scanLine(y);
+        for (int x = 0; x < kGrainTile; ++x) {
+            double value = 1.0;
+            switch (grain) {
+            case Grain::None:
+                break;
+            case Grain::Paper: {
+                // Зуб бумаги: мелкая рябь, средние комки, крупные пятна.
+                // Порог мягкий — у зерна не должно быть рубленого края.
+                const double n = 0.46 * smoothNoise(x, y, 2, kGrainTile, 11)
+                               + 0.34 * smoothNoise(x, y, 4, kGrainTile, 12)
+                               + 0.20 * smoothNoise(x, y, 16, kGrainTile, 13);
+                value = smoothstep(0.34, 0.66, n);
+                break;
+            }
+            case Grain::Graphite: {
+                const double n = 0.62 * smoothNoise(x, y, 2, kGrainTile, 21)
+                               + 0.38 * smoothNoise(x, y, 8, kGrainTile, 22);
+                value = 0.30 + 0.70 * smoothstep(0.15, 0.85, n);
+                break;
+            }
+            case Grain::Wash: {
+                // Разводы крупные и мягкие: это не зерно бумаги, а неровность
+                // самой заливки.
+                const double n = 0.55 * smoothNoise(x, y, 8, kGrainTile, 31)
+                               + 0.45 * smoothNoise(x, y, 32, kGrainTile, 32);
+                value = 0.55 + 0.45 * n;
+                break;
+            }
+            }
+            line[x] = uchar(qBound(0.0, value, 1.0) * 255.0 + 0.5);
+        }
+    }
+    return tile;
+}
+
+// Плитка нужного зерна. Строится при первом обращении и живёт до конца
+// работы; берётся один раз на отпечаток, а не на каждый его пиксель.
+const QImage *grainTile(Grain grain)
+{
+    if (grain == Grain::None)
+        return nullptr;
+
+    static const QImage paper = buildGrainTile(Grain::Paper);
+    static const QImage graphite = buildGrainTile(Grain::Graphite);
+    static const QImage wash = buildGrainTile(Grain::Wash);
+
+    switch (grain) {
+    case Grain::Paper:    return &paper;
+    case Grain::Graphite: return &graphite;
+    case Grain::Wash:     return &wash;
+    case Grain::None:     break;
+    }
+    return nullptr;
+}
+
+// Кладёт отпечаток в карту покрытия мазка.
+//
+// Отпечаток считается прямо здесь, а не берётся готовой картинкой: только
+// так центр может стоять между пикселями. Раньше он округлялся до целого,
+// и край наклонного мазка получал ступеньки в один пиксель — именно они
+// и выглядели грубой «пиксельной» кромкой.
+//
+// Правило прибавки задаёт стиль: «не копится» — берём большее из старого
+// и нового, «копится» — складываем как две полупрозрачные плёнки, и второй
+// проход выходит темнее первого.
+void stampDab(QImage &mask, const QPointF &centre, double angleDegrees,
+              double radius, const DabSpec &spec, const QRect &clip, bool antialias)
+{
     const double alongRadius = radius;
     const double acrossRadius = qMax(0.4, radius * spec.aspect);
+    const double reach = qMax(alongRadius, acrossRadius) + 1.0;
 
-    const int extent = int(qCeil(qMax(alongRadius, acrossRadius))) + 1;
-    const int size = extent * 2 + 1;
-
-    QImage dab(size, size, QImage::Format_Grayscale8);
-    dab.fill(0);
+    const int firstX = qMax(clip.left(), int(qFloor(centre.x() - reach)));
+    const int lastX = qMin(clip.right(), int(qCeil(centre.x() + reach)));
+    const int firstY = qMax(clip.top(), int(qFloor(centre.y() - reach)));
+    const int lastY = qMin(clip.bottom(), int(qCeil(centre.y() + reach)));
+    if (firstX > lastX || firstY > lastY)
+        return;
 
     const double theta = qDegreesToRadians(angleDegrees + spec.angle);
     const double cs = qCos(theta);
     const double sn = qSin(theta);
     const int bristles = qMax(3, int(radius / 1.6));
+    const QImage *grain = grainTile(spec.grain);
 
-    for (int y = 0; y < size; ++y) {
-        uchar *line = dab.scanLine(y);
-        for (int x = 0; x < size; ++x) {
-            const double dx = x - extent;
-            const double dy = y - extent;
+    for (int y = firstY; y <= lastY; ++y) {
+        uchar *dst = mask.scanLine(y);
+        const uchar *grainLine = grain ? grain->constScanLine(y & (kGrainTile - 1))
+                                       : nullptr;
+        // Считаем от середины пикселя: его цвет отвечает за то, что в центре.
+        const double dy = y + 0.5 - centre.y();
+
+        for (int x = firstX; x <= lastX; ++x) {
+            const double dx = x + 0.5 - centre.x();
             // Переходим в систему отпечатка: вдоль его оси и поперёк неё.
             const double along = (dx * cs + dy * sn) / alongRadius;
             const double across = (-dx * sn + dy * cs) / acrossRadius;
@@ -201,38 +288,9 @@ QImage buildDab(const DabSpec &spec, int width, double angleDegrees, bool antial
             if (!antialias)
                 a = (a >= 0.5) ? 1.0 : 0.0;
 
-            line[x] = uchar(qBound(0.0, a, 1.0) * 255.0 + 0.5);
-        }
-    }
-    return dab;
-}
-
-// Кладёт отпечаток в карту покрытия мазка. Правило прибавки задаёт стиль:
-// «не копится» — берём большее из старого и нового, «копится» — складываем
-// как две полупрозрачные плёнки, и второй проход выходит темнее первого.
-void stampDab(QImage &mask, const QImage &dab, const QPointF &centre,
-              const QRect &clip, const DabSpec &spec)
-{
-    const int half = dab.width() / 2;
-    const int originX = qRound(centre.x()) - half;
-    const int originY = qRound(centre.y()) - half;
-
-    const int firstY = qMax(clip.top(), originY);
-    const int lastY = qMin(clip.bottom(), originY + dab.height() - 1);
-    const int firstX = qMax(clip.left(), originX);
-    const int lastX = qMin(clip.right(), originX + dab.width() - 1);
-
-    for (int y = firstY; y <= lastY; ++y) {
-        const uchar *src = dab.constScanLine(y - originY);
-        uchar *dst = mask.scanLine(y);
-        for (int x = firstX; x <= lastX; ++x) {
-            double a = src[x - originX] / 255.0;
-            if (a <= 0.0)
-                continue;
-
             a *= spec.flow;
-            if (spec.grain != Grain::None)
-                a *= grainAt(spec.grain, x, y);
+            if (grainLine)
+                a *= grainLine[x & (kGrainTile - 1)] / 255.0;
             if (a <= 0.0)
                 continue;
 
@@ -320,23 +378,7 @@ void Stroke::begin(const QSize &canvas, const QColor &colour, int width,
 void Stroke::end()
 {
     m_mask = QImage();
-    m_dabs.clear();
     m_carry = 0.0;
-}
-
-const QImage &Stroke::dabFor(double angleDegrees)
-{
-    const DabSpec spec = specFor(m_style);
-    // Направление огрубляем до шестнадцати секторов: перестраивать отпечаток
-    // на каждый шаг пути незачем, а на глаз разница неразличима.
-    const int sector = spec.followsPath
-                           ? ((int(qRound(angleDegrees / 22.5)) % 16) + 16) % 16
-                           : 0;
-
-    auto it = m_dabs.find(sector);
-    if (it == m_dabs.end())
-        it = m_dabs.insert(sector, buildDab(spec, m_width, sector * 22.5, m_antialias));
-    return it.value();
 }
 
 QRect Stroke::addSegment(QImage &target, const QPointF &from, const QPointF &to)
@@ -390,14 +432,20 @@ QRect Stroke::addSegment(QImage &target, const QPointF &from, const QPointF &to)
     if (centres.isEmpty())
         return QRect();
 
-    const double angle = (length < 1e-6) ? 0.0 : qRadiansToDegrees(qAtan2(dy, dx));
-    const QImage &dab = dabFor(angle);
-    const int half = dab.width() / 2;
+    // Направление нужно только тем кистям, что разворачиваются по пути.
+    const double angle = (spec.followsPath && length >= 1e-6)
+                             ? qRadiansToDegrees(qAtan2(dy, dx))
+                             : 0.0;
+
+    // Захват отпечатка: наибольший из двух радиусов плюс пиксель на мягкий край.
+    const double reach = qMax(radius, qMax(0.4, radius * spec.aspect)) + 1.0;
+    const int pad = int(qCeil(reach)) + 1;
 
     QRect area;
     for (const QPointF &centre : std::as_const(centres)) {
-        area = area.united(QRect(qRound(centre.x()) - half, qRound(centre.y()) - half,
-                                 dab.width(), dab.height()));
+        area = area.united(QRect(int(qFloor(centre.x())) - pad,
+                                 int(qFloor(centre.y())) - pad,
+                                 pad * 2 + 2, pad * 2 + 2));
     }
     area = area.intersected(target.rect()).intersected(m_mask.rect());
     if (area.isEmpty())
@@ -409,7 +457,7 @@ QRect Stroke::addSegment(QImage &target, const QPointF &from, const QPointF &to)
         return QRect();
 
     for (const QPointF &centre : std::as_const(centres))
-        stampDab(m_mask, dab, centre, area, spec);
+        stampDab(m_mask, centre, angle, radius, spec, area, m_antialias);
 
     compositeDelta(target, m_mask, before, area, m_colour);
     return area;
@@ -478,42 +526,45 @@ QBrush styledBrush(const QColor &color, FillMode fill)
     if (fill == FillMode::Solid || fill == FillMode::None)
         return QBrush(color);
 
-    // Текстурная заливка — тайл 48×48, который Qt размножит по фигуре.
-    const int tileSize = 48;
-    QImage tile(tileSize, tileSize, QImage::Format_ARGB32);
-    tile.fill(Qt::transparent);
-
-    QPainter p(&tile);
-    p.setRenderHint(QPainter::Antialiasing, true);
-    p.setPen(Qt::NoPen);
-
-    int passes = 0;
-    int alphaLow = 0;
-    int alphaHigh = 0;
-    double radius = 1.0;
+    // Заливка берёт ту же фактуру, что и мазок этим же материалом: иначе
+    // контур и заливка одной фигуры выглядели бы сделанными разным инструментом.
+    // Прежде здесь сыпались сотни случайных пятнышек — они и давали ту самую
+    // рябь из пикселей, потому что каждое пятнышко было размером в пиксель.
+    Grain grain = Grain::None;
+    double density = 1.0;
 
     switch (fill) {
-    case FillMode::Crayon:        passes = 1400; alphaLow =  90; alphaHigh = 210; radius = 0.9; break;
-    case FillMode::Marker:        passes =  900; alphaLow =  50; alphaHigh =  90; radius = 2.2; break;
-    case FillMode::Oil:           passes = 1100; alphaLow = 170; alphaHigh = 250; radius = 1.8; break;
-    case FillMode::NaturalPencil: passes =  900; alphaLow =  60; alphaHigh = 150; radius = 0.7; break;
-    case FillMode::Watercolour:   passes =  600; alphaLow =  25; alphaHigh =  60; radius = 3.0; break;
-    default:                      passes =  800; alphaLow = 200; alphaHigh = 255; radius = 1.0; break;
+    case FillMode::Crayon:        grain = Grain::Paper;    density = 0.85; break;
+    case FillMode::NaturalPencil: grain = Grain::Graphite; density = 0.50; break;
+    case FillMode::Watercolour:   grain = Grain::Wash;     density = 0.35; break;
+    case FillMode::Marker:        grain = Grain::None;     density = 0.38; break;
+    case FillMode::Oil:           grain = Grain::Wash;     density = 0.92; break;
+    default:                      grain = Grain::None;     density = 1.00; break;
     }
 
-    for (int i = 0; i < passes; ++i) {
-        QColor c = color;
-        c.setAlpha(alphaLow + int(randomDouble() * (alphaHigh - alphaLow)));
-        p.setBrush(c);
-        const double x = randomDouble() * tileSize;
-        const double y = randomDouble() * tileSize;
-        const double r = radius * (0.6 + randomDouble() * 0.8);
-        p.drawEllipse(QPointF(x, y), r, r);
-        // Дубли по краям, чтобы стык тайлов не бросался в глаза.
-        if (x < r) p.drawEllipse(QPointF(x + tileSize, y), r, r);
-        if (y < r) p.drawEllipse(QPointF(x, y + tileSize), r, r);
+    const QImage *texture = grainTile(grain);
+    const int tileSize = texture ? kGrainTile : 8;
+
+    QImage tile(tileSize, tileSize, QImage::Format_ARGB32_Premultiplied);
+    tile.fill(Qt::transparent);
+
+    const double tint = color.alphaF() * density;
+    const int red = color.red();
+    const int green = color.green();
+    const int blue = color.blue();
+
+    for (int y = 0; y < tileSize; ++y) {
+        const uchar *grainLine = texture ? texture->constScanLine(y) : nullptr;
+        QRgb *out = reinterpret_cast<QRgb *>(tile.scanLine(y));
+        for (int x = 0; x < tileSize; ++x) {
+            double a = tint;
+            if (grainLine)
+                a *= grainLine[x] / 255.0;
+            const int alpha = int(qBound(0.0, a, 1.0) * 255.0 + 0.5);
+            out[x] = qRgba(red * alpha / 255, green * alpha / 255,
+                           blue * alpha / 255, alpha);
+        }
     }
-    p.end();
 
     return QBrush(tile);
 }
