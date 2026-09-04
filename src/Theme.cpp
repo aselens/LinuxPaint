@@ -452,21 +452,6 @@ QScrollArea#ShapesBox QScrollBar::handle:vertical {
     margin: 0;
 }
 
-/* Список слоёв: фон рисует сама панель, а полоса прокрутки узкая — иначе
-   она отъедала бы у миниатюр те немногие пиксели, что есть в запасе. */
-QScrollArea#LayersList,
-QScrollArea#LayersList > QWidget > QWidget {
-    background: transparent;
-}
-QScrollArea#LayersList QScrollBar:vertical {
-    width: 6px;
-    margin: 2px 1px;
-}
-QScrollArea#LayersList QScrollBar::handle:vertical {
-    border-radius: 3px;
-    margin: 0;
-}
-
 QScrollBar:vertical {
     background: transparent;
     width: 12px;

@@ -51,7 +51,6 @@ public slots:
 
 private:
     void showItemMenu(int index, const QPoint &globalPos);
-    void updateHeight();          // высота панели — по числу слоёв
 
     Document *m_document = nullptr;
     QToolButton *m_addButton = nullptr;

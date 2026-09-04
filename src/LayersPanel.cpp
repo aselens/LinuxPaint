@@ -17,18 +17,6 @@ const int kThumbWidth = 84;
 const int kThumbHeight = 62;
 const int kEyeSize = 18;
 
-// Раскладка панели: поля по краям, высота кнопки «добавить слой»,
-// отступ между элементами. Из этих же чисел считается высота панели.
-const int kPanelMargin = 8;
-const int kButtonHeight = 28;
-const int kItemGap = 6;
-
-// Высота панели — ровно две миниатюры, сколько бы слоёв ни было: остальные
-// прокручиваются внутри. Число постоянное, а не по количеству слоёв, иначе
-// панель то и дело меняла бы длину, а при десятке слоёв вытягивалась бы
-// во всё окно — с этого и начались правки.
-const int kVisibleRows = 2;
-
 // Шахматка, сквозь которую видно прозрачные места слоя.
 void drawCheckerboard(QPainter &p, const QRect &rect)
 {
@@ -132,24 +120,21 @@ LayersPanel::LayersPanel(Document *document, QWidget *parent)
 {
     setObjectName(QStringLiteral("LayersPanel"));
     setAttribute(Qt::WA_StyledBackground, true);
-    // Ширины ровно хватает: за вычетом полей и узкой полосы прокрутки
-    // остаётся в точности ширина миниатюры, так что полоса ничего не режет.
     setFixedWidth(kThumbWidth + 30);
 
     auto *root = new QVBoxLayout(this);
-    root->setContentsMargins(kPanelMargin, kPanelMargin, kPanelMargin, kPanelMargin);
-    root->setSpacing(kPanelMargin);
+    root->setContentsMargins(8, 8, 8, 8);
+    root->setSpacing(8);
 
     m_addButton = new QToolButton(this);
     m_addButton->setAutoRaise(true);
     m_addButton->setIconSize(QSize(20, 20));
-    m_addButton->setFixedHeight(kButtonHeight);
+    m_addButton->setFixedHeight(28);
     m_addButton->setToolTip(tr("Добавить слой"));
     m_addButton->setIcon(Icons::action(Icons::Action::AddLayer));
     root->addWidget(m_addButton, 0, Qt::AlignHCenter);
 
     auto *scroll = new QScrollArea(this);
-    scroll->setObjectName(QStringLiteral("LayersList"));
     scroll->setWidgetResizable(true);
     scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     scroll->setFrameShape(QFrame::NoFrame);
@@ -157,7 +142,7 @@ LayersPanel::LayersPanel(Document *document, QWidget *parent)
     auto *host = new QWidget(scroll);
     m_itemsLayout = new QVBoxLayout(host);
     m_itemsLayout->setContentsMargins(0, 0, 0, 0);
-    m_itemsLayout->setSpacing(kItemGap);
+    m_itemsLayout->setSpacing(6);
     m_itemsLayout->addStretch(1);
     scroll->setWidget(host);
 
@@ -211,22 +196,6 @@ void LayersPanel::refresh()
     }
 
     m_itemsLayout->addStretch(1);
-    updateHeight();
-}
-
-void LayersPanel::updateHeight()
-{
-    // Панель занимала всю высоту рабочей области, из-за чего выглядела
-    // непомерно длинной. Теперь её длина задана в миниатюрах и не зависит
-    // ни от числа слоёв, ни от размеров окна.
-    const int rows = kVisibleRows;
-    const int itemHeight = kThumbHeight + 8;
-
-    setFixedHeight(kPanelMargin                             // поле сверху
-                   + kButtonHeight                          // кнопка «добавить»
-                   + kPanelMargin                           // отступ до списка
-                   + rows * itemHeight + (rows - 1) * kItemGap
-                   + kPanelMargin);                         // поле снизу
 }
 
 void LayersPanel::showItemMenu(int index, const QPoint &globalPos)
