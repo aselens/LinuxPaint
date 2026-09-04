@@ -726,7 +726,8 @@ void MainWindow::createRibbon()
     connect(m_brushGallery, &GalleryPopup::entrySelected, this, [this](int id) {
         m_canvas->setBrush(BrushType(id));
         m_canvas->setTool(ToolId::Brush);
-        m_brushButton->setIcon(Icons::brush(BrushType(id)));
+        // Значок кнопки не трогаем: он берётся из действия и должен быть
+        // одним и тем же до нажатия и после (см. applyIcons).
     });
 
     // --- фигуры ---
@@ -1325,8 +1326,13 @@ void MainWindow::applyIcons()
     for (int i = 0; i < m_shapeButtons.size(); ++i)
         m_shapeButtons[i]->setIcon(Icons::shape(ShapeType(i)));
 
-    if (m_brushButton)
-        m_brushButton->setIcon(Icons::brush(m_canvas->settings().brush));
+    // Кнопке «Кисти» значок отдельно не назначаем. Она создана через
+    // setDefaultAction, а QToolButton перечитывает значок у действия при
+    // каждом его изменении — в том числе когда инструмент становится
+    // выбранным. Поэтому нарисованный мазок, положенный поверх, держался
+    // ровно до первого нажатия, а потом сменялся значком из действия.
+    // Значок кисти остаётся один — из набора Fluent, как у прочих кнопок;
+    // разные мазки по-прежнему видно в самой галерее.
 
     // Кнопки, раскрывающие меню, носят шеврон прямо в значке.
     if (m_rotateButton)
