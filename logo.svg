@@ -1,5 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="4096" height="4096">
-  <rect width="100%" height="100%" fill="rgba(255,255,255,0)"/>
+<!-- Этот файл ставится в систему как значок приложения. Внутри программы
+     тот же логотип живёт отдельной копией — в src/LogoData.h; правки нужно
+     вносить в оба места. Прямоугольник-подложка
+     <rect width="100%" height="100%" fill="rgba(255,255,255,0)"/>
+     отсюда удалён: разборщик SVG в Qt не понимает запись цвета rgba() и
+     заменяет её чёрной, а проценты без viewBox ему не на что опереть —
+     получался чёрный квадрат в левом верхнем углу значка. -->
+<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="4096" height="4096" viewBox="0 0 4096 4096">
   <g transform="translate(2048.00693508 1958.53022285) scale(6.1623)">
     <linearGradient id="a" x1="198.04672" x2="309.49811" y1="93.277061" y2="236.8008" gradientTransform="translate(-601.2903 -296.4701) scale(3.7795)" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#3ac8f3"/>
