@@ -18,7 +18,13 @@ protected:
     virtual bool smooth() const { return false; }
     virtual int strokeWidth() const;
 
+    // Сообщает документу о задетой области, пропуская пустые.
+    void touchStroke(const QRect &dirty);
+
     QPointF m_last;
+    // Накопитель мазка: он и решает, как отпечатки складываются между
+    // собой, поэтому живёт от нажатия до отпускания кнопки.
+    paintutil::Stroke m_stroke;
 };
 
 // Кисти: тот же обход, но стиль берётся из выбранной кисти.

@@ -26,9 +26,21 @@ void PencilTool::press(const QPointF &pos, Qt::MouseButton button, Qt::KeyboardM
     // Слой заводится только при неполной непрозрачности; при 100 %
     // вызов ничего не делает и рисование идёт прямо в холст.
     m_canvas->beginStrokeLayer();
-    paintutil::drawStroke(image(), pos, pos, strokeColor(), strokeWidth(),
-                          style(), smooth() && settings().antialias, m_phase);
-    doc()->touch(paintutil::strokeBounds(pos, pos, strokeWidth()));
+
+    // Мазок начинается здесь и живёт до отпускания кнопки: карта покрытия
+    // общая на весь мазок, иначе перекрытия снова начали бы темнеть.
+    m_stroke.begin(image().size(), strokeColor(), strokeWidth(), style(),
+                   smooth() && settings().antialias);
+    touchStroke(m_stroke.addSegment(image(), pos, pos));
+}
+
+void PencilTool::touchStroke(const QRect &dirty)
+{
+    // Пустая область значит, что ни один отпечаток не лёг: между двумя
+    // событиями мыши не набралось и шага. Тревожить документ незачем —
+    // иначе каждое такое движение перерисовывало бы весь холст.
+    if (!dirty.isEmpty())
+        doc()->touch(dirty);
 }
 
 void PencilTool::move(const QPointF &pos, Qt::KeyboardModifiers mods)
@@ -47,9 +59,7 @@ void PencilTool::move(const QPointF &pos, Qt::KeyboardModifiers mods)
             target.setX(m_last.x());
     }
 
-    paintutil::drawStroke(image(), m_last, target, strokeColor(), strokeWidth(),
-                          style(), smooth() && settings().antialias, m_phase);
-    doc()->touch(paintutil::strokeBounds(m_last, target, strokeWidth()));
+    touchStroke(m_stroke.addSegment(image(), m_last, target));
     m_last = target;
 }
 
@@ -58,6 +68,7 @@ void PencilTool::release(const QPointF &pos, Qt::MouseButton button, Qt::Keyboar
     if (!m_active)
         return;
     Tool::release(pos, button, mods);
+    m_stroke.end();
     m_canvas->commitStrokeLayer();
     doc()->endEdit();
 }
@@ -91,9 +102,9 @@ void BrushTool::tick()
 {
     if (!needsTick())
         return;
-    paintutil::drawStroke(image(), m_hover, m_hover, strokeColor(), strokeWidth(),
-                          StrokeStyle::Airbrush, settings().antialias, m_phase);
-    doc()->touch(paintutil::strokeBounds(m_hover, m_hover, strokeWidth() * 2));
+    // Аэрограф копится: каждый тик добавляет краски в то же место, и пятно
+    // постепенно набирает плотность — как у настоящего.
+    touchStroke(m_stroke.addSegment(image(), m_hover, m_hover));
 }
 
 // --- ластик --------------------------------------------------------------

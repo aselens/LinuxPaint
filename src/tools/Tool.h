@@ -4,10 +4,12 @@
 #include <QColor>
 #include <QCursor>
 #include <QFont>
+#include <QHash>
 #include <QImage>
 #include <QPainterPath>
 #include <QPointF>
 #include <QRect>
+#include <QSize>
 #include <QVector>
 
 class QPainter;
@@ -118,12 +120,48 @@ struct ToolSettings {
 
 namespace paintutil {
 
-// Наносит отрезок выбранным стилем прямо в изображение.
-// `phase` — сквозной счётчик шагов внутри одного штриха: текстурные кисти
-// используют его, чтобы узор не «стоял на месте» при повторном проходе.
-void drawStroke(QImage &target, const QPointF &from, const QPointF &to,
-                const QColor &color, int width, StrokeStyle style,
-                bool antialias, quint32 &phase);
+// Один мазок от нажатия до отпускания кнопки.
+//
+// Кисть работает так же, как в настоящих графических редакторах: вдоль пути
+// с частым шагом ставятся отпечатки с мягким краем, но не прямо в холст, а в
+// отдельную карту покрытия. В холст попадает только прибавка покрытия — и
+// только один раз на пиксель. Отсюда два свойства, которых не было раньше:
+//
+//   * перекрывающиеся отпечатки не складываются в тёмные комки, и штрих не
+//     распадается на цепочку кружков — видна ровная линия;
+//   * при медленном движении мышью, когда отпечатки ложатся друг на друга
+//     десятками, краска не темнеет — ровно так ведёт себя кисть в Paint.
+//
+// Кисти, которым положено копиться при повторном проходе (аэрограф, мелок,
+// карандаш, акварель), объявлены отдельно и складываются как настоящие:
+// второй проход по тому же месту темнее первого.
+class Stroke
+{
+public:
+    void begin(const QSize &canvas, const QColor &colour, int width,
+               StrokeStyle style, bool antialias);
+    // Наносит отрезок на target; возвращает задетую область.
+    QRect addSegment(QImage &target, const QPointF &from, const QPointF &to);
+    void end();
+    bool isActive() const { return !m_mask.isNull(); }
+
+private:
+    const QImage &dabFor(double angleDegrees);
+
+    QImage m_mask;                  // накопленное покрытие мазка, 8 бит
+    QColor m_colour;
+    int m_width = 1;
+    StrokeStyle m_style = StrokeStyle::Solid;
+    bool m_antialias = true;
+    double m_carry = 0.0;           // остаток шага, перенесённый с прошлого отрезка
+    QHash<int, QImage> m_dabs;      // отпечатки по секторам направления
+};
+
+// Непрерывный штрих по точкам — тем же накопителем, что и Stroke.
+// Для готовых линий: контуры фигур, образцы кистей в галерее.
+void drawPolyline(QImage &target, const QVector<QPointF> &points,
+                  const QColor &colour, int width, StrokeStyle style,
+                  bool antialias);
 
 // Обводит произвольный контур выбранным стилем.
 void strokePath(QImage &target, const QPainterPath &path, const QColor &color,

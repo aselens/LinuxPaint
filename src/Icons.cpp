@@ -416,12 +416,8 @@ QIcon brush(BrushType id, int size)
     QImage img(kBase, kBase, QImage::Format_ARGB32);
     img.fill(Qt::transparent);
 
-    quint32 phase = 0;
-    const StrokeStyle style = strokeStyleForBrush(id);
-    paintutil::drawStroke(img, QPointF(12, 50), QPointF(30, 26),
-                          g_foreground, 9, style, true, phase);
-    paintutil::drawStroke(img, QPointF(30, 26), QPointF(52, 16),
-                          g_foreground, 9, style, true, phase);
+    paintutil::drawPolyline(img, {QPointF(12, 50), QPointF(30, 26), QPointF(52, 16)},
+                            g_foreground, 9, strokeStyleForBrush(id), true);
 
     QPixmap pm = QPixmap::fromImage(img);
     if (size != kBase)
@@ -448,17 +444,16 @@ QIcon brushSample(BrushType id, const QSize &size)
                  left + span * 0.72, middle + swing * 2.4,
                  right, middle - swing);
 
-    // Мазок наносим не одной линией, а короткими отрезками вдоль дуги:
-    // текстурным кистям нужен ход пера, иначе от них останется ровная полоса.
-    const StrokeStyle style = strokeStyleForBrush(id);
-    const int steps = 56;
-    quint32 phase = 0;
-    QPointF previous = path.pointAtPercent(0.0);
-    for (int i = 1; i <= steps; ++i) {
-        const QPointF point = path.pointAtPercent(double(i) / steps);
-        paintutil::drawStroke(img, previous, point, g_foreground, 7, style, true, phase);
-        previous = point;
-    }
+    // Дугу разбиваем на короткие отрезки: кисть должна пройти по ней так же,
+    // как прошла бы по холсту, — с тем же ходом и той же фактурой.
+    const int steps = 64;
+    QVector<QPointF> points;
+    points.reserve(steps + 1);
+    for (int i = 0; i <= steps; ++i)
+        points.append(path.pointAtPercent(double(i) / steps));
+
+    paintutil::drawPolyline(img, points, g_foreground, 7,
+                            strokeStyleForBrush(id), true);
 
     return QIcon(QPixmap::fromImage(img));
 }
@@ -512,9 +507,8 @@ QIcon strokeStyle(StrokeStyle style, int size)
 {
     QImage img(kBase, kBase, QImage::Format_ARGB32);
     img.fill(Qt::transparent);
-    quint32 phase = 0;
-    paintutil::drawStroke(img, QPointF(10, 40), QPointF(54, 24),
-                          g_foreground, 8, style, true, phase);
+    paintutil::drawPolyline(img, {QPointF(10, 40), QPointF(54, 24)},
+                            g_foreground, 8, style, true);
     QPixmap pm = QPixmap::fromImage(img);
     if (size != kBase)
         pm = pm.scaled(size, size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
