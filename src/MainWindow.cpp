@@ -19,7 +19,7 @@
 #include <QComboBox>
 #include <QFileDialog>
 #include <QFileInfo>
-#include <QFontComboBox>
+#include <QFontDatabase>
 #include <QFrame>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -37,6 +37,7 @@
 #include <QPrinter>
 #include <QScrollArea>
 #include <QScrollBar>
+#include <QSet>
 #include <QSettings>
 #include <QSlider>
 #include <QSpinBox>
@@ -46,6 +47,8 @@
 #include <QVBoxLayout>
 #include <QWidgetAction>
 #include <QtMath>
+
+#include <utility>
 
 namespace {
 
@@ -916,9 +919,10 @@ void MainWindow::createRibbon()
     // --- текст (контекстная группа) ---
     m_textGroup = m_ribbon->addGroup(tr("Текст"));
 
-    m_fontCombo = new QFontComboBox;
+    m_fontCombo = new QComboBox;
     m_fontCombo->setFixedWidth(150);
-    m_fontCombo->setCurrentFont(m_canvas->settings().font);
+    m_fontCombo->setMaxVisibleItems(20);
+    fillFontCombo();
     m_textGroup->addItem(m_fontCombo);
 
     m_fontSizeCombo = new QComboBox;
@@ -960,7 +964,7 @@ void MainWindow::createRibbon()
     m_opaqueTextButton->setToolTip(tr("Непрозрачная подложка под текстом (Цвет 2)"));
     m_textGroup->addItem(m_opaqueTextButton);
 
-    connect(m_fontCombo, &QFontComboBox::currentFontChanged, this, &MainWindow::updateTextFont);
+    connect(m_fontCombo, &QComboBox::currentIndexChanged, this, &MainWindow::updateTextFont);
     connect(m_fontSizeCombo, &QComboBox::currentTextChanged, this, &MainWindow::updateTextFont);
     connect(m_boldButton, &QToolButton::toggled, this, &MainWindow::updateTextFont);
     connect(m_italicButton, &QToolButton::toggled, this, &MainWindow::updateTextFont);
@@ -968,6 +972,10 @@ void MainWindow::createRibbon()
     connect(m_opaqueTextButton, &QToolButton::toggled, this, [this](bool on) {
         m_canvas->setTextOpaque(on);
     });
+
+    // Список заполнялся до подключения сигналов, поэтому холст о выбранном
+    // шрифте ещё не знает — досылаем.
+    updateTextFont();
 
     m_textGroup->setVisible(false);
 
@@ -1726,12 +1734,105 @@ void MainWindow::onToolChanged(ToolId id)
     }
 }
 
+void MainWindow::fillFontCombo()
+{
+    // Названия — как в Paint, а набирается каждое тем семейством из списка
+    // замен, которое нашлось в системе. Первым всегда стоит сам оригинал:
+    // если гарнитуры Microsoft установлены, берём их. Дальше идут замены,
+    // совпадающие по метрикам, — строка ими займёт ровно столько же места.
+    struct Choice {
+        const char *name;
+        const char *families[5];
+    };
+
+    static const Choice kChoices[] = {
+        { "Arial",           { "Arial", "Liberation Sans", "Arimo", "Nimbus Sans", "DejaVu Sans" } },
+        { "Calibri",         { "Calibri", "Carlito", "Liberation Sans", "DejaVu Sans", nullptr } },
+        { "Cambria",         { "Cambria", "Caladea", "Liberation Serif", "DejaVu Serif", nullptr } },
+        { "Comic Sans MS",   { "Comic Sans MS", "Comic Relief", "Comic Neue", nullptr, nullptr } },
+        { "Consolas",        { "Consolas", "Inconsolata", "Liberation Mono", "DejaVu Sans Mono", nullptr } },
+        { "Courier New",     { "Courier New", "Liberation Mono", "Cousine", "Nimbus Mono PS", "DejaVu Sans Mono" } },
+        { "Georgia",         { "Georgia", "Gelasio", "Liberation Serif", "DejaVu Serif", nullptr } },
+        { "Impact",          { "Impact", "Anton", "Oswald", nullptr, nullptr } },
+        { "Segoe UI",        { "Segoe UI", "Selawik", "Open Sans", "Liberation Sans", "DejaVu Sans" } },
+        { "Tahoma",          { "Tahoma", "DejaVu Sans", "Liberation Sans", nullptr, nullptr } },
+        { "Times New Roman", { "Times New Roman", "Liberation Serif", "Tinos", "Nimbus Roman", "DejaVu Serif" } },
+        { "Trebuchet MS",    { "Trebuchet MS", "Fira Sans", "DejaVu Sans", nullptr, nullptr } },
+        { "Verdana",         { "Verdana", "DejaVu Sans", "Bitstream Vera Sans", "Liberation Sans", nullptr } },
+    };
+
+    const QStringList installed = QFontDatabase::families();
+    QSet<QString> available;
+    for (const QString &family : installed)
+        available.insert(family.toLower());
+
+    QSet<QString> taken;
+
+    // Размер образца в списке. Имя шрифта показывается им же самим — как
+    // в Paint, где по списку видно начертание, а не только название.
+    auto addEntry = [this](const QString &label, const QString &family) {
+        QFont preview(family);
+        preview.setPointSize(11);
+
+        m_fontCombo->addItem(label, family);
+        const int row = m_fontCombo->count() - 1;
+        m_fontCombo->setItemData(row, preview, Qt::FontRole);
+        // Имя подменено — пусть подсказка говорит, чем набрано на самом деле.
+        if (label.compare(family, Qt::CaseInsensitive) != 0)
+            m_fontCombo->setItemData(row, tr("%1 (в системе: %2)").arg(label, family),
+                                     Qt::ToolTipRole);
+    };
+
+    for (const Choice &choice : kChoices) {
+        for (const char *candidate : choice.families) {
+            if (!candidate)
+                break;
+            const QString family = QString::fromLatin1(candidate);
+            if (!available.contains(family.toLower()))
+                continue;
+            addEntry(QString::fromLatin1(choice.name), family);
+            taken.insert(family.toLower());
+            break;
+        }
+    }
+
+    // Ниже — всё остальное, что есть в системе: набор Paint удобен, но
+    // отрезать пользователя от его собственных шрифтов было бы слишком.
+    QStringList rest;
+    for (const QString &family : installed) {
+        if (taken.contains(family.toLower()))
+            continue;
+        if (QFontDatabase::isPrivateFamily(family))
+            continue;
+        // Шрифты без латиницы — это наборы под другие письменности и
+        // значковые гарнитуры; в списке для надписей им делать нечего.
+        if (!QFontDatabase::writingSystems(family).contains(QFontDatabase::Latin))
+            continue;
+        rest << family;
+    }
+    rest.sort(Qt::CaseInsensitive);
+
+    if (!rest.isEmpty() && m_fontCombo->count() > 0)
+        m_fontCombo->insertSeparator(m_fontCombo->count());
+    for (const QString &family : std::as_const(rest))
+        addEntry(family, family);
+
+    // Список может оказаться пуст только в системе вовсе без шрифтов —
+    // но пустой выпадающий список хуже любой заглушки.
+    if (m_fontCombo->count() == 0)
+        addEntry(QStringLiteral("Sans Serif"), QStringLiteral("Sans Serif"));
+
+    // Выбираем то, что уже стоит в настройках, иначе первое из списка.
+    const int current = m_fontCombo->findData(m_canvas->settings().font.family());
+    m_fontCombo->setCurrentIndex(current >= 0 ? current : 0);
+}
+
 void MainWindow::updateTextFont()
 {
     if (!m_fontCombo || !m_fontSizeCombo)
         return;
 
-    QFont font = m_fontCombo->currentFont();
+    QFont font(m_fontCombo->currentData().toString());
     bool ok = false;
     const int size = m_fontSizeCombo->currentText().toInt(&ok);
     font.setPointSize((ok && size > 0) ? size : 12);

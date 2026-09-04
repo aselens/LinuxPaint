@@ -20,7 +20,6 @@ class RibbonGroup;
 class QAction;
 class QActionGroup;
 class QComboBox;
-class QFontComboBox;
 class QLabel;
 class QMenu;
 class QScrollArea;
@@ -107,6 +106,7 @@ private:
     void refreshBackdrop();       // перекрасить подложку под текущую тему
     void createTopBar();          // строка Файл / Правка / Вид и быстрые кнопки
     void createRibbon();
+    void fillFontCombo();          // список шрифтов Paint с заменами для Linux
     void createStatusBar();
     void createCentralArea();
     void applyIcons();
@@ -212,7 +212,8 @@ private:
 
     // Контекстная группа «Текст» — видна только при активном инструменте текста.
     RibbonGroup *m_textGroup = nullptr;
-    QFontComboBox *m_fontCombo = nullptr;
+    // Не QFontComboBox: там весь системный список, а нужен набор Paint.
+    QComboBox *m_fontCombo = nullptr;
     QComboBox *m_fontSizeCombo = nullptr;
     QToolButton *m_boldButton = nullptr;
     QToolButton *m_italicButton = nullptr;
