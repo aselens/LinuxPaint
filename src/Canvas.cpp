@@ -312,6 +312,14 @@ void Canvas::setGridVisible(bool visible)
     update();
 }
 
+void Canvas::setSmoothZoom(bool on)
+{
+    if (m_smoothZoom == on)
+        return;
+    m_smoothZoom = on;
+    update();
+}
+
 // --- координаты ----------------------------------------------------------
 
 QPoint Canvas::imageOrigin() const
@@ -390,7 +398,11 @@ void Canvas::paintEvent(QPaintEvent *event)
     painter.translate(imageOrigin());
     painter.scale(m_zoom, m_zoom);
 
-    painter.setRenderHint(QPainter::SmoothPixmapTransform, m_zoom < 1.0);
+    // Уменьшённый холст сглаживаем всегда — иначе при сжатии теряются целые
+    // строки пикселей. Увеличенный — только по просьбе: обычно правят
+    // отдельные точки, и размытый пиксель этому мешает.
+    painter.setRenderHint(QPainter::SmoothPixmapTransform,
+                          m_zoom < 1.0 || m_smoothZoom);
     painter.drawImage(0, 0, m_document->composite());
 
     // Незавершённый полупрозрачный штрих показываем поверх холста с той же

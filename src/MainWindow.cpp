@@ -278,6 +278,7 @@ MainWindow::MainWindow(QWidget *parent)
     // Настройки, для применения которых нужны уже созданные виджеты.
     m_canvas->setAntialias(m_antialias);
     m_canvas->setGridVisible(m_gridAction->isChecked());
+    m_canvas->setSmoothZoom(m_smoothZoomAction->isChecked());
     statusBar()->setVisible(m_statusBarAction->isChecked());
 
     // Canvas стартует с карандашом, поэтому setTool() ничего не переключит —
@@ -405,6 +406,10 @@ void MainWindow::createActions()
     m_zoomResetAction = make(tr("Масштаб 100 %"), QKeySequence(QStringLiteral("Ctrl+0")));
     m_zoomFitAction = make(tr("Вписать в окно"), QKeySequence(QStringLiteral("Ctrl+9")));
     m_gridAction = make(tr("Линии сетки"), QKeySequence(QStringLiteral("Ctrl+G")));
+    m_smoothZoomAction = make(tr("Сглаживать при увеличении"));
+    m_smoothZoomAction->setToolTip(
+        tr("Показывать увеличенный холст мягко, без квадратов пикселей. "
+           "Подробностей это не добавляет — только сглаживает показ."));
     m_rulersAction = make(tr("Линейки"), QKeySequence(QStringLiteral("Ctrl+R")));
     m_statusBarAction = make(tr("Строка состояния"));
     m_fullScreenAction = make(tr("Во весь экран"), QKeySequence(Qt::Key_F11));
@@ -414,6 +419,8 @@ void MainWindow::createActions()
     // которых ещё нет.
     m_gridAction->setCheckable(true);
     m_gridAction->setChecked(m_startGrid);
+    m_smoothZoomAction->setCheckable(true);
+    m_smoothZoomAction->setChecked(m_startSmoothZoom);
     m_rulersAction->setCheckable(true);
     m_rulersAction->setChecked(m_startRulers);
     m_statusBarAction->setCheckable(true);
@@ -428,6 +435,9 @@ void MainWindow::createActions()
     });
     connect(m_gridAction, &QAction::toggled, this, [this](bool on) {
         m_canvas->setGridVisible(on);
+    });
+    connect(m_smoothZoomAction, &QAction::toggled, this, [this](bool on) {
+        m_canvas->setSmoothZoom(on);
     });
     connect(m_rulersAction, &QAction::toggled, this, [this](bool on) {
         m_horizontalRuler->setVisible(on);
@@ -569,6 +579,7 @@ void MainWindow::createTopBar()
     viewMenu->addAction(m_zoomOutAction);
     viewMenu->addAction(m_zoomResetAction);
     viewMenu->addAction(m_zoomFitAction);
+    viewMenu->addAction(m_smoothZoomAction);
     viewMenu->addSeparator();
     viewMenu->addAction(m_rulersAction);
     viewMenu->addAction(m_gridAction);
@@ -1963,6 +1974,7 @@ void MainWindow::loadSettings()
     m_antialias = settings.value(QStringLiteral("antialias"), true).toBool();
     m_startRulers = settings.value(QStringLiteral("rulers"), false).toBool();
     m_startGrid = settings.value(QStringLiteral("grid"), false).toBool();
+    m_startSmoothZoom = settings.value(QStringLiteral("smoothZoom"), false).toBool();
     m_startStatusBar = settings.value(QStringLiteral("statusBar"), true).toBool();
 }
 
@@ -1975,6 +1987,7 @@ void MainWindow::saveSettings()
     settings.setValue(QStringLiteral("antialias"), m_antialias);
     settings.setValue(QStringLiteral("rulers"), m_rulersAction->isChecked());
     settings.setValue(QStringLiteral("grid"), m_gridAction->isChecked());
+    settings.setValue(QStringLiteral("smoothZoom"), m_smoothZoomAction->isChecked());
     settings.setValue(QStringLiteral("statusBar"), m_statusBarAction->isChecked());
 }
 

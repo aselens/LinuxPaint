@@ -83,6 +83,11 @@ public:
     void zoomAtImagePoint(int direction, const QPointF &anchor);
     void setGridVisible(bool visible);
     bool isGridVisible() const { return m_showGrid; }
+    // Показывать ли увеличенный холст сглаженно. Увеличение не добавляет
+    // изображению подробностей, но выбор есть: либо честные квадраты
+    // пикселей, либо мягкая картинка без ступенек на краях.
+    void setSmoothZoom(bool on);
+    bool isSmoothZoom() const { return m_smoothZoom; }
 
     // --- координаты -----------------------------------------------------
     QPointF widgetToImage(const QPointF &p) const;
@@ -178,6 +183,7 @@ private:
 
     double m_zoom = 1.0;
     bool m_showGrid = false;
+    bool m_smoothZoom = false;
     int m_margin = 8;
 
     QImage m_strokeLayer;

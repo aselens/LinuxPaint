@@ -185,6 +185,7 @@ private:
     QAction *m_zoomResetAction = nullptr;
     QAction *m_zoomFitAction = nullptr;
     QAction *m_gridAction = nullptr;
+    QAction *m_smoothZoomAction = nullptr;
     QAction *m_rulersAction = nullptr;
     QAction *m_statusBarAction = nullptr;
     QAction *m_fullScreenAction = nullptr;
@@ -237,5 +238,6 @@ private:
     // Прочитаны до создания действий, поэтому хранятся отдельно.
     bool m_startRulers = false;
     bool m_startGrid = false;
+    bool m_startSmoothZoom = false;
     bool m_startStatusBar = true;
 };
