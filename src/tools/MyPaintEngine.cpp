@@ -36,35 +36,34 @@ struct BrushRecipe {
     double smudge;          // подхват цвета с холста
     double smudgeLength;    // насколько долго подхваченный цвет держится
     double slowTracking;    // сглаживание хода руки
-    double speedOpacity;    // как скорость влияет на плотность
 };
 
 BrushRecipe recipeFor(StrokeStyle style)
 {
     switch (style) {
     case StrokeStyle::Solid:
-        return {0.90, 1.00, 3.0, 1.00, 0.00, 0.00, 1.00,   0.0, 0.00, 0.5, 2.0, 0.00};
+        return {0.90, 1.00, 3.0, 1.00, 0.00, 0.00, 1.00,   0.0, 0.00, 0.5, 0.20};
     case StrokeStyle::Calligraphy1:
-        return {0.95, 1.00, 4.0, 1.05, 0.00, 0.00, 4.00, -45.0, 0.00, 0.5, 1.5, 0.00};
+        return {0.95, 1.00, 4.0, 1.05, 0.00, 0.00, 4.00, -45.0, 0.00, 0.5, 0.15};
     case StrokeStyle::Calligraphy2:
-        return {0.95, 1.00, 4.0, 1.05, 0.00, 0.00, 4.00,  45.0, 0.00, 0.5, 1.5, 0.00};
+        return {0.95, 1.00, 4.0, 1.05, 0.00, 0.00, 4.00,  45.0, 0.00, 0.5, 0.15};
     case StrokeStyle::Airbrush:
         // Мягкое облако, плотность которого набирается проходами.
-        return {0.05, 0.06, 6.0, 1.80, 0.00, 0.10, 1.00,   0.0, 0.00, 0.5, 1.0, 0.00};
+        return {0.05, 0.06, 6.0, 1.80, 0.00, 0.10, 1.00,   0.0, 0.00, 0.5, 0.10};
     case StrokeStyle::Oil:
         // Масло тянет за собой цвет с холста — за это отвечает smudge.
-        return {0.75, 0.95, 5.0, 1.00, 0.06, 0.08, 1.20,   0.0, 0.55, 0.6, 2.5, 0.00};
+        return {0.75, 0.95, 5.0, 1.00, 0.06, 0.08, 1.20,   0.0, 0.55, 0.6, 0.25};
     case StrokeStyle::Crayon:
-        return {0.45, 0.30, 4.0, 1.00, 0.25, 0.55, 1.00,   0.0, 0.00, 0.5, 1.0, 0.35};
+        return {0.45, 0.30, 4.0, 1.00, 0.25, 0.55, 1.00,   0.0, 0.00, 0.5, 0.10};
     case StrokeStyle::Marker:
-        return {0.95, 0.40, 5.0, 1.00, 0.00, 0.00, 1.80, -30.0, 0.00, 0.5, 2.0, 0.00};
+        return {0.95, 0.40, 5.0, 1.00, 0.00, 0.00, 1.80, -30.0, 0.00, 0.5, 0.20};
     case StrokeStyle::NaturalPencil:
-        return {0.35, 0.22, 4.0, 0.75, 0.20, 0.45, 1.00,   0.0, 0.00, 0.5, 1.0, 0.45};
+        return {0.35, 0.22, 4.0, 0.75, 0.20, 0.45, 1.00,   0.0, 0.00, 0.5, 0.10};
     case StrokeStyle::Watercolour:
         // Акварель размывает то, по чему прошла, и ложится тонким слоем.
-        return {0.10, 0.10, 3.0, 1.40, 0.10, 0.15, 1.00,   0.0, 0.70, 0.9, 3.0, 0.20};
+        return {0.10, 0.10, 3.0, 1.40, 0.10, 0.15, 1.00,   0.0, 0.70, 0.9, 0.30};
     }
-    return {0.90, 1.00, 3.0, 1.00, 0.00, 0.00, 1.00, 0.0, 0.00, 0.5, 2.0, 0.00};
+    return {0.90, 1.00, 3.0, 1.00, 0.00, 0.00, 1.00, 0.0, 0.00, 0.5, 0.20};
 }
 
 } // namespace
@@ -76,6 +75,8 @@ struct MyPaintEngine::Private {
 
     QImage base;            // холст, каким он был до начала мазка
     QSize size;
+    QPointF last;           // прошлая точка пути
+    double radius = 1.0;    // нужен, чтобы прикинуть задетую область
     bool firstPoint = true;
 
     void release()
@@ -91,6 +92,8 @@ struct MyPaintEngine::Private {
         fixed = nullptr;
         base = QImage();
         size = QSize();
+        last = QPointF();
+        radius = 1.0;
         firstPoint = true;
     }
 };
@@ -165,7 +168,8 @@ bool MyPaintEngine::begin(const QImage &target, const QColor &colour, int width,
     set(MYPAINT_BRUSH_SETTING_SMUDGE, recipe.smudge);
     set(MYPAINT_BRUSH_SETTING_SMUDGE_LENGTH, recipe.smudgeLength);
     set(MYPAINT_BRUSH_SETTING_SLOW_TRACKING, recipe.slowTracking);
-    set(MYPAINT_BRUSH_SETTING_OPAQUE_MULTIPLY, recipe.speedOpacity);
+    // OPAQUE_MULTIPLY здесь не трогаем: у умолчаний движка он привязан
+    // к нажиму пера, и подмена базового значения ломает эту связь.
 
     // Сглаживание края — то самое, из-за чего мазок перестаёт распадаться
     // на пиксели. При выключенном сглаживании в настройках его отключаем:
@@ -188,6 +192,8 @@ bool MyPaintEngine::begin(const QImage &target, const QColor &colour, int width,
 
     d->base = target.copy();
     d->size = target.size();
+    d->radius = radius;
+    d->last = QPointF();
     d->firstPoint = true;
     return !d->base.isNull();
 }
@@ -203,16 +209,37 @@ QRect MyPaintEngine::motion(QImage &target, const QPointF &pos, double seconds)
     if (!isActive() || target.isNull() || target.size() != d->size)
         return QRect();
 
-    // Первая точка подаётся с нулевой длительностью: движок ставит перо
-    // на место, не проводя линию из прошлого мазка.
-    const double dtime = d->firstPoint ? 0.0 : qMax(0.0005, seconds);
+    // Первым делом перо надо поставить на место, ничего не рисуя. У только
+    // что созданной кисти оно стоит в начале координат, и первый же отрезок
+    // движок провёл бы из левого верхнего угла холста. Штатный приём для
+    // этого — вызов с нулевым нажимом: краски он не кладёт, а положение
+    // запоминает. Большой промежуток времени вдобавок не даёт движку
+    // домыслить путь: он считает, что перо всё это время стояло.
+    if (d->firstPoint) {
+        d->firstPoint = false;
+        d->last = pos;
+
+        mypaint_surface_begin_atomic(d->surface);
+        mypaint_brush_stroke_to(d->brush, d->surface,
+                                float(pos.x()), float(pos.y()),
+                                0.0f,          // нажим: перо не касается холста
+                                0.0f, 0.0f,    // наклон пера
+                                1.0);
+        MyPaintRectangle placed;
+        placed.x = 0;
+        placed.y = 0;
+        placed.width = 0;
+        placed.height = 0;
+        mypaint_surface_end_atomic(d->surface, &placed);
+        return QRect();
+    }
 
     mypaint_surface_begin_atomic(d->surface);
     mypaint_brush_stroke_to(d->brush, d->surface,
                             float(pos.x()), float(pos.y()),
-                            1.0f,          // давление: мышь всегда полное
-                            0.0f, 0.0f,    // наклон пера
-                            dtime);
+                            1.0f,          // нажим: у мыши он всегда полный
+                            0.0f, 0.0f,
+                            qMax(0.0005, seconds));
     MyPaintRectangle roi;
     roi.x = 0;
     roi.y = 0;
@@ -220,10 +247,22 @@ QRect MyPaintEngine::motion(QImage &target, const QPointF &pos, double seconds)
     roi.height = 0;
     mypaint_surface_end_atomic(d->surface, &roi);
 
-    d->firstPoint = false;
+    // Область считаем и сами: отрезок пути, раздутый на радиус кисти с
+    // запасом. Движок сообщает свою — берём объединение, чтобы не зависеть
+    // от того, насколько точно он её считает.
+    const double pad = d->radius * 2.0 + 8.0;
+    QRect area = QRectF(d->last, pos).normalized()
+                     .adjusted(-pad, -pad, pad, pad)
+                     .toAlignedRect()
+                     .intersected(target.rect());
 
-    QRect area(roi.x, roi.y, roi.width, roi.height);
-    area = area.intersected(target.rect());
+    const QRect reported = QRect(roi.x, roi.y, roi.width, roi.height)
+                               .intersected(target.rect());
+    if (!reported.isEmpty())
+        area = area.united(reported);
+
+    d->last = pos;
+
     if (area.isEmpty())
         return QRect();
 
