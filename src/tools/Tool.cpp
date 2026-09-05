@@ -259,6 +259,21 @@ void stampDab(QImage &mask, const QPointF &centre, double angleDegrees,
     const int bristles = qMax(3, int(radius / 1.6));
     const QImage *grain = grainTile(spec.grain);
 
+    // Жёсткость задана долей радиуса, а сглаженной кромке нужна ширина
+    // в пикселях. У жёсткой кисти (0,95) спад приходится на последние два
+    // с половиной процента радиуса: при радиусе в шесть пикселей это
+    // пятнадцать сотых пикселя — то есть край ступенчатый, сколько ни
+    // включай сглаживание. Поэтому жёсткость дополнительно ограничиваем
+    // сверху так, чтобы кромка занимала около пикселя с четвертью, но
+    // не больше трети радиуса — иначе мелкие кисти расплылись бы.
+    double hardness = spec.hardness;
+    if (antialias) {
+        const double narrow = qMin(alongRadius, acrossRadius);
+        const double band = qMin(1.25, narrow * 0.34);
+        const double inner = qMax(0.0, narrow - band) / qMax(0.0001, narrow);
+        hardness = qMin(hardness, inner * inner);
+    }
+
     for (int y = firstY; y <= lastY; ++y) {
         uchar *dst = mask.scanLine(y);
         const uchar *grainLine = grain ? grain->constScanLine(y & (kGrainTile - 1))
@@ -272,7 +287,7 @@ void stampDab(QImage &mask, const QPointF &centre, double angleDegrees,
             const double along = (dx * cs + dy * sn) / alongRadius;
             const double across = (-dx * sn + dy * cs) / acrossRadius;
 
-            double a = dabOpacity(along * along + across * across, spec.hardness);
+            double a = dabOpacity(along * along + across * across, hardness);
             if (a <= 0.0)
                 continue;
 

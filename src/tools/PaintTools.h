@@ -2,7 +2,9 @@
 
 #include "tools/Tool.h"
 
-// Карандаш: жёсткая линия без сглаживания.
+// Карандаш. Толщиной в один пиксель всегда идёт чётким пером — сглаживать
+// там нечего, а размытая точка вместо пикселя только мешает. Толще — идёт
+// со сглаженным краем, как кисти, если сглаживание включено в настройках.
 class PencilTool : public Tool
 {
 public:
@@ -15,7 +17,9 @@ public:
 
 protected:
     virtual StrokeStyle style() const { return StrokeStyle::Solid; }
-    virtual bool smooth() const { return false; }
+    // Слушается ли инструмент настройки сглаживания. Чёткость линии
+    // в один пиксель обеспечивает сам движок мазка, не этот флаг.
+    virtual bool smooth() const { return true; }
     virtual int strokeWidth() const;
 
     // Сообщает документу о задетой области, пропуская пустые.
@@ -40,7 +44,6 @@ public:
 
 protected:
     StrokeStyle style() const override;
-    bool smooth() const override { return true; }
     int strokeWidth() const override;
 
 private:
