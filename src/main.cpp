@@ -9,7 +9,8 @@ int main(int argc, char *argv[])
     QApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("linux-paint"));
     app.setOrganizationName(QStringLiteral("linux-paint"));
-    app.setApplicationVersion(QStringLiteral("1.0.0"));
+    // Версия приходит из CMake — см. PAINT_VERSION в CMakeLists.txt.
+    app.setApplicationVersion(QStringLiteral(PAINT_VERSION));
     app.setDesktopFileName(QStringLiteral("linux-paint"));
     // Значок задаём на уровне приложения: часть оболочек берёт его отсюда,
     // а не из отдельного окна.

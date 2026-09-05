@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(linux-paint
-    VERSION 1.0.0
+    VERSION 1.2.0
     DESCRIPTION "MS Paint clone for Linux"
     LANGUAGES CXX)
 
@@ -61,6 +61,11 @@ add_executable(linux-paint ${PAINT_SOURCES} ${PAINT_HEADERS})
 target_include_directories(linux-paint PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
+# Версия задаётся здесь одним местом и попадает в программу отсюда же:
+# продублируй её в исходниках — и рано или поздно они разойдутся.
+target_compile_definitions(linux-paint PRIVATE
+    PAINT_VERSION="${PROJECT_VERSION}")
+
 target_link_libraries(linux-paint PRIVATE
     Qt6::Widgets
     Qt6::PrintSupport)
@@ -114,7 +119,7 @@ set(CPACK_DEBIAN_PACKAGE_DESCRIPTION
  shapes with editable handles, selections, text, layers and the usual
  image operations. Built with Qt 6.")
 
-# Имя файла в принятом Debian виде: linux-paint_1.0.0_amd64.deb
+# Имя файла в принятом Debian виде: linux-paint_1.2.0_amd64.deb
 set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 
 # Зависимости от библиотек Qt вычисляются автоматически по самому бинарнику.

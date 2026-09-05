@@ -3,6 +3,7 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
@@ -348,7 +349,7 @@ void showAboutDialog(QWidget *parent)
     text->setText(QStringLiteral(
                       "<h2 style='margin:0 0 12px 0;'>About LinuxPaint</h2>"
                       "<p style='margin:0 0 12px 0;'>"
-                      "LinuxPaint; v.1.0 for Linux<br>"
+                      "LinuxPaint; v.%3 for Linux<br>"
                       "Officially InoMotion software"
                       "</p>"
                       "<p style='margin:0 0 12px 0;'>"
@@ -362,8 +363,11 @@ void showAboutDialog(QWidget *parent)
                       "To learn how you can contribute to InoMotion LinuxPaint, "
                       "check out the project on <a href=\"%2\">GitHub</a>."
                       "</p>")
+                      // Версию берём у приложения, а не пишем строкой: она
+                      // задана в CMakeLists.txt и должна быть одна на всех.
                       .arg(QString::fromLatin1(kSiteUrl),
-                           QString::fromLatin1(kGithubUrl)));
+                           QString::fromLatin1(kGithubUrl),
+                           QCoreApplication::applicationVersion()));
 
     auto *logo = new QLabel(&dialog);
     logo->setPixmap(Icons::application().pixmap(128, 128));
