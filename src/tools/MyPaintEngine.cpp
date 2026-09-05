@@ -38,6 +38,65 @@ struct BrushRecipe {
     double slowTracking;    // сглаживание хода руки
 };
 
+// Переносит холст в поверхность движка.
+//
+// Без этого поверхность оставалась бы пустой, и кисти с размазыванием
+// (масло, акварель) подхватывали бы с неё пустоту и размазывали её по
+// рисунку — со стороны это выглядело как стирание вокруг кисти. Заодно
+// отпадает нужда держать отдельную копию холста: поверхность и есть холст.
+void loadCanvas(MyPaintTiledSurface *tiled, const QImage &source)
+{
+    const QImage canvas = source.format() == QImage::Format_ARGB32
+                              ? source
+                              : source.convertToFormat(QImage::Format_ARGB32);
+    if (canvas.isNull())
+        return;
+
+    const int tilesX = (canvas.width() + kTile - 1) / kTile;
+    const int tilesY = (canvas.height() + kTile - 1) / kTile;
+
+    for (int ty = 0; ty < tilesY; ++ty) {
+        for (int tx = 0; tx < tilesX; ++tx) {
+            MyPaintTileRequest request;
+            // Последний параметр — «только чтение»; здесь нужна запись.
+            mypaint_tile_request_init(&request, 0, tx, ty, 0);
+            mypaint_tiled_surface_tile_request_start(tiled, &request);
+            uint16_t *buffer = request.buffer;
+            if (!buffer) {
+                mypaint_tiled_surface_tile_request_end(tiled, &request);
+                continue;
+            }
+
+            for (int y = 0; y < kTile; ++y) {
+                const int canvasY = ty * kTile + y;
+                const QRgb *line = (canvasY < canvas.height())
+                    ? reinterpret_cast<const QRgb *>(canvas.constScanLine(canvasY))
+                    : nullptr;
+
+                for (int x = 0; x < kTile; ++x) {
+                    uint16_t *px = buffer + (y * kTile + x) * 4;
+                    const int canvasX = tx * kTile + x;
+                    if (!line || canvasX >= canvas.width()) {
+                        // За краем холста — пусто.
+                        px[0] = px[1] = px[2] = px[3] = 0;
+                        continue;
+                    }
+
+                    const QRgb colour = line[canvasX];
+                    const int alpha = qAlpha(colour) * kOne / 255;
+                    // В тайле цвет хранится домноженным на альфу.
+                    px[3] = uint16_t(alpha);
+                    px[0] = uint16_t(qRed(colour) * alpha / 255);
+                    px[1] = uint16_t(qGreen(colour) * alpha / 255);
+                    px[2] = uint16_t(qBlue(colour) * alpha / 255);
+                }
+            }
+
+            mypaint_tiled_surface_tile_request_end(tiled, &request);
+        }
+    }
+}
+
 BrushRecipe recipeFor(StrokeStyle style)
 {
     switch (style) {
@@ -48,11 +107,13 @@ BrushRecipe recipeFor(StrokeStyle style)
     case StrokeStyle::Calligraphy2:
         return {0.95, 1.00, 4.0, 1.05, 0.00, 0.00, 4.00,  45.0, 0.00, 0.5, 0.15};
     case StrokeStyle::Airbrush:
-        // Мягкое облако, плотность которого набирается проходами.
-        return {0.05, 0.06, 6.0, 1.80, 0.00, 0.10, 1.00,   0.0, 0.00, 0.5, 0.10};
+        // Мягкое облако, плотность которого набирается проходами. hardness
+        // здесь — не «мягкость», а точка, где начинается спад: возьми её
+        // близкой к нулю, и отпечаток выродится в невидимую иглу.
+        return {0.35, 0.13, 6.0, 1.80, 0.00, 0.10, 1.00,   0.0, 0.00, 0.5, 0.10};
     case StrokeStyle::Oil:
         // Масло тянет за собой цвет с холста — за это отвечает smudge.
-        return {0.75, 0.95, 5.0, 1.00, 0.06, 0.08, 1.20,   0.0, 0.55, 0.6, 0.25};
+        return {0.75, 0.95, 5.0, 1.00, 0.06, 0.08, 1.20,   0.0, 0.35, 0.6, 0.25};
     case StrokeStyle::Crayon:
         return {0.45, 0.30, 4.0, 1.00, 0.25, 0.55, 1.00,   0.0, 0.00, 0.5, 0.10};
     case StrokeStyle::Marker:
@@ -61,7 +122,7 @@ BrushRecipe recipeFor(StrokeStyle style)
         return {0.35, 0.22, 4.0, 0.75, 0.20, 0.45, 1.00,   0.0, 0.00, 0.5, 0.10};
     case StrokeStyle::Watercolour:
         // Акварель размывает то, по чему прошла, и ложится тонким слоем.
-        return {0.10, 0.10, 3.0, 1.40, 0.10, 0.15, 1.00,   0.0, 0.70, 0.9, 0.30};
+        return {0.30, 0.18, 3.0, 1.40, 0.10, 0.15, 1.00,   0.0, 0.40, 0.9, 0.30};
     }
     return {0.90, 1.00, 3.0, 1.00, 0.00, 0.00, 1.00, 0.0, 0.00, 0.5, 0.20};
 }
@@ -73,7 +134,6 @@ struct MyPaintEngine::Private {
     MyPaintFixedTiledSurface *fixed = nullptr;
     MyPaintSurface *surface = nullptr;
 
-    QImage base;            // холст, каким он был до начала мазка
     QSize size;
     QPointF last;           // прошлая точка пути
     double radius = 1.0;    // нужен, чтобы прикинуть задетую область
@@ -90,7 +150,6 @@ struct MyPaintEngine::Private {
             surface = nullptr;
         }
         fixed = nullptr;
-        base = QImage();
         size = QSize();
         last = QPointF();
         radius = 1.0;
@@ -190,12 +249,22 @@ bool MyPaintEngine::begin(const QImage &target, const QColor &colour, int width,
     mypaint_brush_reset(d->brush);
     mypaint_brush_new_stroke(d->brush);
 
-    d->base = target.copy();
+    // Холст переезжает в поверхность движка целиком — иначе кистям
+    // с размазыванием нечего подхватывать.
+    mypaint_surface_begin_atomic(d->surface);
+    loadCanvas(reinterpret_cast<MyPaintTiledSurface *>(d->fixed), target);
+    MyPaintRectangle loaded;
+    loaded.x = 0;
+    loaded.y = 0;
+    loaded.width = 0;
+    loaded.height = 0;
+    mypaint_surface_end_atomic(d->surface, &loaded);
+
     d->size = target.size();
     d->radius = radius;
     d->last = QPointF();
     d->firstPoint = true;
-    return !d->base.isNull();
+    return true;
 }
 
 void MyPaintEngine::end()
@@ -266,9 +335,6 @@ QRect MyPaintEngine::motion(QImage &target, const QPointF &pos, double seconds)
     if (area.isEmpty())
         return QRect();
 
-    // Пересобираем задетый кусок: копия холста плюс слой мазка поверх.
-    // Класть слой на уже готовый результат нельзя — он бы темнел с каждым
-    // движением мыши.
     QImage layer(area.size(), QImage::Format_ARGB32);
     layer.fill(Qt::transparent);
 
@@ -325,10 +391,11 @@ QRect MyPaintEngine::motion(QImage &target, const QPointF &pos, double seconds)
         }
     }
 
+    // Поверхность держит холст целиком, а не одну лишь краску мазка, поэтому
+    // прочитанный кусок просто замещает то, что было. Ничего накладывать
+    // поверх не нужно — а значит, нечему и темнеть от повторных проходов.
     QPainter p(&target);
     p.setCompositionMode(QPainter::CompositionMode_Source);
-    p.drawImage(area.topLeft(), d->base, area);
-    p.setCompositionMode(QPainter::CompositionMode_SourceOver);
     p.drawImage(area.topLeft(), layer);
     return area;
 }
