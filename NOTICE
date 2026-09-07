@@ -1,0 +1,67 @@
+InoMotion LinuxPaint
+Copyright (C) 2026 Konstantin "0corteZz" Gorbunov / InoMotion
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. The full text is in the LICENSE file.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+
+ADDITIONAL TERM UNDER SECTION 7(c)
+----------------------------------
+
+As permitted by section 7(c) of the GNU General Public License version 3, the
+following additional term applies to this program:
+
+    Modified versions must be marked in reasonable ways as different from the
+    original version, and must not be presented as official InoMotion releases.
+
+The names "InoMotion" and "LinuxPaint", and the project logo, are not licensed
+for use in modified versions. You are free to fork, modify and redistribute the
+code under the GPL — but please give your fork its own name, so that users can
+tell it apart from the official build.
+
+You may remove this additional term from any copy you receive, as section 7 of
+the GPL allows.
+
+
+THIRD-PARTY COMPONENTS
+----------------------
+
+Fluent UI System Icons
+https://github.com/microsoft/fluentui-system-icons
+
+The tool and action icons in this program are traced from Microsoft's Fluent UI
+System Icons, embedded in src/FluentIcons.h. They are distributed under the MIT
+licence, which is compatible with the GPL and whose text must be preserved:
+
+    Copyright (c) Microsoft Corporation.
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+    THE SOFTWARE.
+
+Qt 6
+https://www.qt.io
+
+This program is built against the Qt 6 libraries, used under the GNU Lesser
+General Public License version 3. Qt is not included in this repository; the
+AppImage builds bundle the Qt libraries as shipped by the distribution.
